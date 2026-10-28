@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="style.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
     <script src="supabase-config.js"></script>
+    <script src="rag-config.js"></script>
     <script src="app.js" defer></script>
   </head>
   <body>
@@ -311,6 +312,47 @@
         <span>FREE LUNCH PROGRAM · NORTH CAROLINA</span>
       </footer>
     </div>
+
+    <button
+      class="assistant-launcher"
+      id="assistant-launcher"
+      type="button"
+      aria-controls="sql-assistant"
+      aria-expanded="false"
+    >
+      <span aria-hidden="true">✦</span>
+      <span>Ask SQL assistant</span>
+    </button>
+
+    <aside
+      class="assistant-panel"
+      id="sql-assistant"
+      aria-labelledby="assistant-title"
+      aria-hidden="true"
+      hidden
+    >
+      <div class="assistant-header">
+        <div>
+          <p class="section-label">RAG SQL GUIDE</p>
+          <h2 id="assistant-title">Ask the data</h2>
+        </div>
+        <button class="text-button assistant-close" id="assistant-close" type="button" aria-label="Close SQL assistant">×</button>
+      </div>
+      <div class="assistant-messages" id="assistant-messages" aria-live="polite">
+        <div class="assistant-empty" id="assistant-empty">
+          <strong>Need a starting point?</strong>
+          <span>Ask a plain-language question about the school lunch data.</span>
+        </div>
+      </div>
+      <form class="assistant-form" id="assistant-form">
+        <label class="visually-hidden" for="assistant-input">Question for SQL assistant</label>
+        <textarea id="assistant-input" rows="3" maxlength="2000" placeholder="How many students attend each school?" disabled></textarea>
+        <div class="assistant-form-actions">
+          <button class="text-button" id="assistant-use-question" type="button" disabled>Use current quiz question</button>
+          <button class="button button-primary" id="assistant-generate" type="submit" disabled>Generate SQL</button>
+        </div>
+      </form>
+    </aside>
 
     <dialog class="signin-dialog" id="signin-dialog" aria-labelledby="signin-title">
       <form method="dialog" class="dialog-close-form">

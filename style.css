@@ -203,6 +203,203 @@ summary:focus-visible {
   display: none !important;
 }
 
+.assistant-launcher {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 43px;
+  padding: 0 15px;
+  border: 1px solid #2b5d91;
+  border-radius: 22px;
+  background: var(--navy);
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(23, 55, 97, 0.24);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.assistant-launcher:hover {
+  background: var(--navy-dark);
+}
+
+.assistant-launcher span:first-child {
+  color: var(--sky);
+  font-size: 15px;
+}
+
+.assistant-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 80px;
+  z-index: 19;
+  width: min(410px, calc(100vw - 32px));
+  height: min(650px, calc(100vh - 112px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid #d8e6f2;
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow: 0 20px 60px rgba(23, 55, 97, 0.22);
+}
+
+.assistant-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 17px 17px 13px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(120deg, #eff7fd, #fff);
+}
+
+.assistant-header h2 {
+  margin: 3px 0 0;
+  color: var(--navy);
+  font-family: var(--display);
+  font-size: 18px;
+  letter-spacing: -0.5px;
+}
+
+.assistant-close {
+  padding: 0 5px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.assistant-messages {
+  overflow-y: auto;
+  padding: 14px;
+  background: #fbfdff;
+}
+
+.assistant-empty,
+.assistant-error,
+.assistant-loading,
+.assistant-message {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 11px 12px;
+  border: 1px solid #e1ebf4;
+  border-radius: 9px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.assistant-empty span,
+.assistant-loading,
+.assistant-error {
+  color: var(--muted);
+}
+
+.assistant-message.is-user {
+  margin-left: 28px;
+  border-color: #d5e8f7;
+  background: #edf7fd;
+  color: var(--navy);
+}
+
+.assistant-message.is-error {
+  border-color: #efd6d1;
+  background: #fff8f6;
+}
+
+.assistant-sql {
+  overflow-x: auto;
+  margin: 4px 0 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: #122a49;
+  color: #e8f4ff;
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.assistant-copy {
+  justify-self: start;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.assistant-sources {
+  margin-top: 2px;
+  border-top: 1px solid #e6eef5;
+}
+
+.assistant-sources summary {
+  padding-top: 7px;
+  color: var(--blue);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.assistant-source {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.assistant-source strong {
+  color: var(--navy);
+}
+
+.assistant-form {
+  padding: 11px;
+  border-top: 1px solid var(--line);
+  background: #fff;
+}
+
+.assistant-form textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 68px;
+  padding: 10px;
+  border: 1px solid #d6e3ef;
+  border-radius: 7px;
+  outline: 0;
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.assistant-form textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(57, 136, 203, 0.12);
+}
+
+.assistant-form-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.assistant-form-actions .text-button {
+  padding-left: 0;
+  font-size: 9px;
+  text-align: left;
+}
+
+.assistant-form-actions .button {
+  min-height: 33px;
+  flex: 0 0 auto;
+}
+
 .welcome-row {
   min-height: 248px;
   display: flex;
@@ -1708,6 +1905,21 @@ h1 span {
 }
 
 @media (max-width: 430px) {
+  .assistant-launcher {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .assistant-panel {
+    top: 12px;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    height: auto;
+    border-radius: 11px;
+  }
+
   .brand-mark {
     width: 30px;
     height: 30px;

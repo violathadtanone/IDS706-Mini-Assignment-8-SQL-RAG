@@ -187,6 +187,7 @@ LIMIT 10;`,
 };
 
 const questionIds = Object.keys(quizzes);
+const APP_STORAGE_PREFIX = "ids706_rag_";
 const editor = document.querySelector("#sql-editor");
 const paramsInput = document.querySelector("#query-parameters");
 const lineNumbers = document.querySelector("#line-numbers");
@@ -207,6 +208,20 @@ const editorAccess = document.querySelector("#editor-access");
 const checkButton = document.querySelector("#check-answer");
 const saveButton = document.querySelector("#save-quiz");
 const runButton = document.querySelector("#run-query");
+const assistantLauncher = document.querySelector("#assistant-launcher");
+const assistantPanel = document.querySelector("#sql-assistant");
+const assistantClose = document.querySelector("#assistant-close");
+const assistantMessages = document.querySelector("#assistant-messages");
+const assistantForm = document.querySelector("#assistant-form");
+const assistantInput = document.querySelector("#assistant-input");
+const assistantGenerate = document.querySelector("#assistant-generate");
+const assistantUseQuestion = document.querySelector("#assistant-use-question");
+const assistantState = {
+  open: false,
+  busy: false,
+  messages: [],
+  requestId: 0,
+};
 
 let currentQuizId = questionIds[0];
 let currentUser = null;
@@ -237,6 +252,205 @@ function setSignInMessage(message, type = "") {
 function getCurrentQuiz() {
   return quizzes[currentQuizId];
 }
+
+function assistantEndpoint() {
+  return typeof window.RAG_CONFIG?.endpoint === "string"
+    ? window.RAG_CONFIG.endpoint.trim()
+    : "";
+}
+
+function renderAssistantMessages() {
+  assistantMessages.replaceChildren();
+  if (assistantState.messages.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "assistant-empty";
+    const title = document.createElement("strong");
+    title.textContent = "Need a starting point?";
+    const copy = document.createElement("span");
+    copy.textContent = "Ask a plain-language question about the school lunch data.";
+    empty.append(title, copy);
+    assistantMessages.append(empty);
+    return;
+  }
+
+  for (const message of assistantState.messages) {
+    const item = document.createElement("article");
+    item.className = `assistant-message is-${message.role}${message.error ? " is-error" : ""}`;
+    const text = document.createElement("span");
+    text.textContent = message.text;
+    item.append(text);
+
+    if (message.sql) {
+      const code = document.createElement("pre");
+      code.className = "assistant-sql";
+      code.textContent = message.sql;
+      item.append(code);
+
+      const copyButton = document.createElement("button");
+      copyButton.className = "assistant-copy";
+      copyButton.type = "button";
+      copyButton.textContent = "Copy SQL";
+      copyButton.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(message.sql);
+          copyButton.textContent = "Copied";
+        } catch {
+          copyButton.textContent = "Copy unavailable";
+        }
+      });
+      item.append(copyButton);
+    }
+
+    if (Array.isArray(message.sources) && message.sources.length > 0) {
+      const details = document.createElement("details");
+      details.className = "assistant-sources";
+      const summary = document.createElement("summary");
+      summary.textContent = `Sources (${message.sources.length})`;
+      details.append(summary);
+      for (const source of message.sources) {
+        const sourceItem = document.createElement("div");
+        sourceItem.className = "assistant-source";
+        const sourceId = document.createElement("strong");
+        sourceId.textContent = String(source.id ?? "Knowledge source");
+        const snippet = document.createElement("span");
+        snippet.textContent = ` — ${String(source.snippet ?? "")}`;
+        sourceItem.append(sourceId, snippet);
+        details.append(sourceItem);
+      }
+      item.append(details);
+    }
+    assistantMessages.append(item);
+  }
+
+  if (assistantState.busy) {
+    const loading = document.createElement("div");
+    loading.className = "assistant-loading";
+    loading.textContent = "Retrieving knowledge and drafting SQL…";
+    assistantMessages.append(loading);
+  }
+  assistantMessages.scrollTop = assistantMessages.scrollHeight;
+}
+
+function updateAssistantControls() {
+  const enabled = signedIn && !assistantState.busy;
+  assistantInput.disabled = !signedIn || assistantState.busy;
+  assistantGenerate.disabled = !enabled;
+  assistantUseQuestion.disabled = !enabled;
+  assistantGenerate.textContent = assistantState.busy ? "Generating…" : "Generate SQL";
+}
+
+function setAssistantOpen(open) {
+  assistantState.open = open;
+  assistantPanel.hidden = !open;
+  assistantPanel.setAttribute("aria-hidden", String(!open));
+  assistantLauncher.setAttribute("aria-expanded", String(open));
+  if (open) {
+    updateAssistantControls();
+    assistantInput.focus();
+  } else {
+    assistantLauncher.focus();
+  }
+}
+
+function addAssistantMessage(message) {
+  assistantState.messages.push(message);
+  renderAssistantMessages();
+}
+
+async function generateAssistantSql(event) {
+  event.preventDefault();
+  if (assistantState.busy) return;
+  const question = assistantInput.value.trim();
+  if (!question) {
+    addAssistantMessage({
+      role: "assistant",
+      text: "Enter a question before generating SQL.",
+      error: true,
+    });
+    return;
+  }
+  if (!signedIn) {
+    addAssistantMessage({
+      role: "assistant",
+      text: "Sign in before using the SQL assistant.",
+      error: true,
+    });
+    return;
+  }
+  const endpoint = assistantEndpoint();
+  if (!endpoint) {
+    addAssistantMessage({
+      role: "assistant",
+      text: "The SQL assistant is not connected. Configure the RAG backend endpoint first.",
+      error: true,
+    });
+    return;
+  }
+  const requestId = ++assistantState.requestId;
+  assistantState.busy = true;
+  addAssistantMessage({ role: "user", text: question });
+  renderAssistantMessages();
+  updateAssistantControls();
+  try {
+    const { data, error } = await client.auth.getSession();
+    if (error || !data.session?.access_token) {
+      throw new Error("Your sign-in session is unavailable. Sign in again.");
+    }
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${data.session.access_token}`,
+      },
+      body: JSON.stringify({ question }),
+    });
+    let payload = {};
+    try {
+      payload = await response.json();
+    } catch {
+      // Use the status-based error below when the backend did not return JSON.
+    }
+    if (!response.ok) {
+      throw new Error(payload.error || "The SQL assistant is unavailable. Try again later.");
+    }
+    if (requestId !== assistantState.requestId) return;
+    if (typeof payload.sql !== "string" || !Array.isArray(payload.sources)) {
+      throw new Error("The SQL assistant returned an invalid response.");
+    }
+    addAssistantMessage({
+      role: "assistant",
+      text: "Generated SQL:",
+      sql: payload.sql,
+      sources: payload.sources,
+    });
+  } catch (error) {
+    if (requestId === assistantState.requestId) {
+      addAssistantMessage({
+        role: "assistant",
+        text: error instanceof Error ? error.message : "The SQL assistant is unavailable.",
+        error: true,
+      });
+    }
+  } finally {
+    if (requestId === assistantState.requestId) {
+      assistantState.busy = false;
+      updateAssistantControls();
+      renderAssistantMessages();
+    }
+  }
+}
+
+assistantLauncher.addEventListener("click", () => setAssistantOpen(!assistantState.open));
+assistantClose.addEventListener("click", () => setAssistantOpen(false));
+assistantForm.addEventListener("submit", generateAssistantSql);
+assistantUseQuestion.addEventListener("click", () => {
+  const quiz = getCurrentQuiz();
+  assistantInput.value = quiz.title;
+  assistantInput.focus();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && assistantState.open) setAssistantOpen(false);
+});
 
 function parseParameters() {
   const raw = paramsInput.value.trim();
@@ -285,7 +499,7 @@ function updateSaveButton() {
 }
 
 function scoreStorageKey() {
-  return `sql-quiz-points:${currentUser.id}`;
+  return `${APP_STORAGE_PREFIX}sql-quiz-points:${currentUser.id}`;
 }
 
 function loadEarnedPoints() {
@@ -357,6 +571,7 @@ function updateAuthControls() {
     : "Sign in to run queries and save your quiz.";
   updateProgress();
   updateSaveButton();
+  updateAssistantControls();
 }
 
 function renderTable(headers, rows, container) {

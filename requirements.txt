@@ -1,2 +1,7 @@
 psycopg2-binary
 python-dotenv
+neo4j
+openai
+fastapi
+uvicorn
+httpx
