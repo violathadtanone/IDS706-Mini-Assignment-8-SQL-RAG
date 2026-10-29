@@ -80,14 +80,22 @@ function setup(
   const sdkClient = {
     auth: {
       onAuthStateChange(callback) { authCallback = callback; },
-      getSession() { return restoredSession.promise; },
+      getSession() {
+        return bootstrap
+          ? restoredSession.promise
+          : Promise.resolve({ data: { session }, error: null });
+      },
       async signInWithOtp(body) {
         requests.push(["send", body]);
         return { error: sendError };
       },
     },
     functions: {
-      async invoke(name, { body }) {
+      async invoke(name, { body, headers }) {
+        if (name === "rag-api") {
+          requests.push([name, { body, headers }]);
+          return { data: { sql: "SELECT COUNT(*) FROM students;", sources: [] }, error: null };
+        }
         assert(name === "quiz-api", "Unexpected function");
         requests.push([body.action, body]);
         if (invokeHook) {
@@ -123,7 +131,7 @@ function setup(
     "localStorage",
     "Response",
     source + `
-    return { signInWithEmail, applySession,
+    return { signInWithEmail, applySession, generateAssistantSql,
       runQuery, saveQuiz, checkAnswer, answersMatch, invokeApi, renderQuiz, quizzes, questionIds, loadSavedProgress,
       points() { return earnedQuestions.size * 4; },
       useClient(value) { client = value; },
@@ -243,6 +251,31 @@ Deno.test("signed-out direct JavaScript calls cannot run, check, invoke, or save
     rejected && requests.length === 0,
     "Signed-out functions sent a backend request",
   );
+});
+
+Deno.test("signed-in assistant sends the current session token to rag-api", async () => {
+  const { app, get, requests, session } = setup();
+  await app.applySession(session);
+  get("#assistant-input").value = "How many students are there?";
+  await app.generateAssistantSql(event);
+  const ragRequest = requests.find(([name]) => name === "rag-api");
+  assert(ragRequest, "Expected rag-api request");
+  assert(
+    ragRequest[1].headers.Authorization === `Bearer ${session.access_token}`,
+    "rag-api request must carry the current user JWT",
+  );
+  assert(
+    !ragRequest[1].headers.Authorization.includes("public-test-key"),
+    "The anon key must not be used as the bearer token",
+  );
+});
+
+Deno.test("signed-out assistant does not invoke rag-api", async () => {
+  const { app, get, requests } = setup();
+  get("#assistant-input").value = "How many students are there?";
+  await app.generateAssistantSql(event);
+  assert(!requests.some(([name]) => name === "rag-api"), "Signed-out assistant sent a request");
+  assert(get("#assistant-messages").children.length > 0, "Signed-out prompt was not rendered");
 });
 
 Deno.test("all five hints provide SQL guidance without solutions and display expected output values", async () => {

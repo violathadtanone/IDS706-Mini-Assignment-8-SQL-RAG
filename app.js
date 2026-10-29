@@ -399,6 +399,9 @@ async function generateAssistantSql(event) {
     }
     const { data: payload, error } = await client.functions.invoke(functionName, {
       body: { question },
+      headers: {
+        Authorization: `Bearer ${sessionData.session.access_token}`,
+      },
     });
     if (error) throw new Error(error.message || "The SQL assistant is unavailable. Try again later.");
     if (requestId !== assistantState.requestId) return;
