@@ -253,9 +253,10 @@ function getCurrentQuiz() {
   return quizzes[currentQuizId];
 }
 
-function assistantEndpoint() {
-  return typeof window.RAG_CONFIG?.endpoint === "string"
-    ? window.RAG_CONFIG.endpoint.trim()
+function assistantFunctionName() {
+  const name = window.RAG_CONFIG?.functionName;
+  return typeof name === "string" && /^[a-z0-9-]+$/.test(name.trim())
+    ? name.trim()
     : "";
 }
 
@@ -377,11 +378,11 @@ async function generateAssistantSql(event) {
     });
     return;
   }
-  const endpoint = assistantEndpoint();
-  if (!endpoint) {
+  const functionName = assistantFunctionName();
+  if (!functionName) {
     addAssistantMessage({
       role: "assistant",
-      text: "The SQL assistant is not connected. Configure the RAG backend endpoint first.",
+      text: "The SQL assistant is not connected. Configure the rag-api function first.",
       error: true,
     });
     return;
@@ -392,27 +393,10 @@ async function generateAssistantSql(event) {
   renderAssistantMessages();
   updateAssistantControls();
   try {
-    const { data, error } = await client.auth.getSession();
-    if (error || !data.session?.access_token) {
-      throw new Error("Your sign-in session is unavailable. Sign in again.");
-    }
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${data.session.access_token}`,
-      },
-      body: JSON.stringify({ question }),
+    const { data: payload, error } = await client.functions.invoke(functionName, {
+      body: { question },
     });
-    let payload = {};
-    try {
-      payload = await response.json();
-    } catch {
-      // Use the status-based error below when the backend did not return JSON.
-    }
-    if (!response.ok) {
-      throw new Error(payload.error || "The SQL assistant is unavailable. Try again later.");
-    }
+    if (error) throw new Error(error.message || "The SQL assistant is unavailable. Try again later.");
     if (requestId !== assistantState.requestId) return;
     if (typeof payload.sql !== "string" || !Array.isArray(payload.sources)) {
       throw new Error("The SQL assistant returned an invalid response.");

@@ -2,3 +2,6 @@ project_id = "ids706-school-lunch-quiz"
 
 [functions.quiz-api]
 verify_jwt = true
+
+[functions.rag-api]
+verify_jwt = true

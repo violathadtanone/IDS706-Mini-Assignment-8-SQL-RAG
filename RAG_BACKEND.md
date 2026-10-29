@@ -1,61 +1,101 @@
-# Separate SQL RAG backend
+# `rag-api` Edge Function
 
-`rag_api.py` is a separate FastAPI service for the floating SQL assistant. It
-does not modify or call the shared Supabase `quiz-api` for quiz operations. It
-verifies the existing Supabase access token through Supabase Auth, then calls
-the reusable pipeline in `sql_rag.py`.
+The new app’s assistant calls the separate Supabase Edge Function `rag-api`.
+It is not the existing `quiz-api`, and it does not modify tables, quiz data,
+authentication settings, or the submitted repository.
 
-## Server configuration
+## Request flow
 
-Set these variables only in the backend environment or a local `.env` file:
+1. Supabase verifies the signed-in user JWT before the handler and the handler
+   explicitly checks the user `sub` with `createSupabaseContext(..., { auth:
+   "user" })`.
+2. The function embeds the question with `text-embedding-3-small` at 1536
+   dimensions.
+3. It calls Neo4j Aura’s HTTPS Query API and the existing
+   `knowledge_embeddings` index. The Cypher result is limited to `node.id`,
+   `node.text`, and `score`; it never returns `properties(node)` or the stored
+   embedding.
+4. It sends the short retrieved context to OpenAI Responses with the
+   server-configured model and `max_output_tokens: 250`.
+5. It returns SQL and source IDs/snippets. Generated SQL is never executed.
+
+The browser sends only `{ "question": "..." }` through
+`supabase.functions.invoke("rag-api", ...)`. OpenAI and Neo4j credentials are
+server-side only. Both GitHub Pages apps share an origin, so CORS cannot
+isolate their repository paths and is not an authentication boundary.
+
+## New function secrets
+
+Set these only in the Supabase Edge Function secret store or a local, ignored
+function environment file. Do not add them to the committed frontend or to
+the submitted repository:
 
 ```text
-OPENAI_API_KEY=...
-OPENAI_SQL_MODEL=gpt-6-luna
-NEO4J_URI=...
-NEO4J_USERNAME=...
-NEO4J_PASSWORD=...
-NEO4J_DATABASE=...
-RAG_SUPABASE_URL=...
-RAG_SUPABASE_ANON_KEY=...
-RAG_ALLOWED_ORIGIN=https://violathadtanone.github.io
+RAG_OPENAI_API_KEY
+RAG_OPENAI_SQL_MODEL=gpt-6-luna
+RAG_NEO4J_URI=neo4j+s://<database-id>.databases.neo4j.io
+RAG_NEO4J_USERNAME
+RAG_NEO4J_PASSWORD
+RAG_NEO4J_DATABASE=neo4j
 RAG_HOURLY_LIMIT=10
 RAG_DAILY_LIMIT=20
 ```
 
-The browser only needs the public `RAG_CONFIG.endpoint` value in
-`rag-config.js`; it must never receive any of the values above.
+`SUPABASE_URL` and `SUPABASE_JWKS` are Supabase-provided runtime values, not
+custom secrets. The function keeps `verify_jwt = true` in
+[supabase/config.toml](./supabase/config.toml), matching this project’s
+existing signed-in Supabase access-token setup. API keys are not accepted as
+the user identity.
 
-CORS should allow the GitHub Pages origin, or the local preview origin during
-development. Because both GitHub Pages repositories share that origin, CORS
-cannot distinguish their repository paths and is not an authentication
-boundary. Supabase token verification and server-side quotas are the security
-controls.
+## Cache, quota, and failure behavior
 
-## Local run
+Question embeddings use a bounded 64-entry, one-hour in-memory cache per Edge
+Function isolate. Calls have a 15-second timeout and no automatic retries.
+The 10/hour and 20/day per-user counters are also bounded in memory and are
+best-effort controls, not hard spending limits: they reset after cold starts
+or restarts and are not shared across workers, regions, or concurrent
+isolates. A durable global limit would require shared rate-limit storage,
+which is intentionally not added here.
 
-Install [requirements.txt](./requirements.txt), then run:
+The frontend makes no request on page load, panel open, or typing. It sends a
+request only after the user submits, prevents duplicate submissions, and
+renders all user text, source snippets, and SQL with text nodes.
+
+## Local mocked checks
+
+With Deno installed, run from the repository root:
 
 ```bash
-RAG_ALLOWED_ORIGIN=http://127.0.0.1:8000 uvicorn rag_api:app --reload --port 8001
+deno test --allow-env supabase/functions/rag-api/index_test.ts
 ```
 
-The frontend can point at `http://127.0.0.1:8001/generate-sql` for a local
-integration test. The backend still requires a valid signed-in Supabase token
-for a real request.
+The tests use mocked OpenAI and Neo4j responses. They do not contact live
+services, execute generated SQL, deploy the function, or set remote secrets.
+The existing Python terminal pipeline remains available in
+[sql_rag.py](./sql_rag.py); its local embedding cache remains ignored.
 
-## Cache and quota limitations
+## Deployment instructions (not run here)
 
-Question embeddings are stored in the ignored `.cache/sql_rag_embeddings.json`
-file. That cache survives a process restart only when the backend runs on a
-persistent filesystem. It is local to one filesystem and is not shared by
-multiple workers or containers, so separate workers may repeat embedding
-requests.
+From this repository, after reviewing the local tests and choosing the
+correct Supabase project ref:
 
-The initial 10-per-user-per-hour and 20-per-user-per-day quotas are held in
-process memory. They reset on restart, are not durable, and are not global
-across multiple workers or instances. A production deployment needs shared
-rate-limit storage such as Redis before these limits can be treated as global.
+```bash
+supabase functions serve rag-api
+supabase secrets set --project-ref <project-ref> \
+  RAG_OPENAI_API_KEY=<value> \
+  RAG_OPENAI_SQL_MODEL=gpt-6-luna \
+  RAG_NEO4J_URI=<aura-neo4j-s-uri> \
+  RAG_NEO4J_USERNAME=<value> \
+  RAG_NEO4J_PASSWORD=<value> \
+  RAG_NEO4J_DATABASE=neo4j \
+  RAG_HOURLY_LIMIT=10 \
+  RAG_DAILY_LIMIT=20
+supabase functions deploy rag-api --project-ref <project-ref>
+```
 
-The endpoint only generates and returns SQL. It never executes or saves the
-generated SQL.
+These commands target only `rag-api`; do not run a deploy command for
+`quiz-api`. Verify the function logs and one controlled signed-in request
+after deployment. Never place real secret values in Git, frontend assets, or
+this document.
+
+Runtime references: [Supabase Edge Function auth](https://supabase.com/docs/guides/functions/auth), [Supabase auth headers](https://supabase.com/docs/guides/functions/auth-headers), [Neo4j Query API](https://neo4j.com/docs/query-api/current/), and [OpenAI TypeScript/API reference](https://developers.openai.com/api/reference/typescript).

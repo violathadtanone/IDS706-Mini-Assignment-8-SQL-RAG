@@ -32,7 +32,7 @@ SEARCH node IN (
   FOR $embedding
   LIMIT 3
 ) SCORE AS score
-RETURN properties(node) AS properties, elementId(node) AS element_id, score
+RETURN node.id AS id, node.text AS text, score
 ORDER BY score DESC
 """
 
@@ -126,6 +126,8 @@ def context_text(records: list[dict[str, Any]]) -> str:
     chunks = []
     for number, record in enumerate(records, start=1):
         properties = record.get("properties") or {}
+        if record.get("text") is not None:
+            properties = {"id": record.get("id"), "text": record.get("text")}
         chunks.append(
             f"[{source_id(properties, number, record.get('element_id'))}] {source_text(properties)}"
         )
@@ -136,6 +138,8 @@ def source_summaries(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sources = []
     for number, record in enumerate(records, start=1):
         properties = record.get("properties") or {}
+        if record.get("text") is not None:
+            properties = {"id": record.get("id"), "text": record.get("text")}
         snippet = " ".join(source_text(properties).split())
         sources.append({
             "id": source_id(properties, number, record.get("element_id")),
