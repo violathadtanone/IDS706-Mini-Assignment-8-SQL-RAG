@@ -248,6 +248,10 @@ summary:focus-visible {
   box-shadow: 0 20px 60px rgba(23, 55, 97, 0.22);
 }
 
+.assistant-panel[hidden] {
+  display: none !important;
+}
+
 .assistant-header {
   display: flex;
   align-items: flex-start;

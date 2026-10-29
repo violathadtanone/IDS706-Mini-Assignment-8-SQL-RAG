@@ -30,9 +30,11 @@ function deferred() {
 }
 
 function setup(
-  { sendError = null, loggingError = null, invokeHook = null, bootstrap = false, ragPayload = null, clipboardError = null } = {},
+  { sendError = null, loggingError = null, invokeHook = null, bootstrap = false, ragPayload = null, clipboardError = null, ragResponse = null } = {},
 ) {
   const nodes = new Map();
+  let focusedElement = null;
+  const documentListeners = {};
   function element() {
     return {
       value: "",
@@ -46,7 +48,9 @@ function setup(
       setAttribute(key, value) {
         this.attributes[key] = value;
       },
-      removeAttribute() {},
+      removeAttribute(key) {
+        delete this.attributes[key];
+      },
       replaceChildren(...children) {
         this.children = children;
       },
@@ -57,7 +61,9 @@ function setup(
       addEventListener(name, callback) {
         this.listeners[name] = callback;
       },
-      focus() {},
+      focus() {
+        focusedElement = this;
+      },
       close() {
         this.open = false;
       },
@@ -71,6 +77,9 @@ function setup(
     querySelectorAll: () => [],
     createElement: element,
     createTextNode: (s) => s,
+    addEventListener(name, callback) {
+      documentListeners[name] = callback;
+    },
   };
   let authCallback, clientOptions;
   const restoredSession = deferred();
@@ -103,6 +112,7 @@ function setup(
       async invoke(name, { body, headers }) {
         if (name === "rag-api") {
           requests.push([name, { body, headers }]);
+          if (ragResponse) return ragResponse;
           return {
             data: ragPayload ?? {
               kind: "sql",
@@ -168,7 +178,8 @@ function setup(
   const get = (selector) => document.querySelector(selector);
   get("#signin-email").value = session.user.email;
   get("#signin-dialog").open = true;
-  return { app, get, requests, session, clientOptions, clipboardWrites,
+  return { app, get, requests, session, clientOptions, clipboardWrites, focusedElement: () => focusedElement,
+    pressKey(key) { documentListeners.keydown?.({ key }); },
     restoreSession(value) { restoredSession.resolve({ data: { session: value }, error: null }); },
     emitAuth(event, value) { authCallback(event, value); },
   };
@@ -400,6 +411,84 @@ Deno.test("unavailable dataset responses show only the Response layout", async (
   assert(!assistantItem.children.some((child) => child.className === "assistant-sql-heading"), "Clarification must not show SQL heading");
   assert(!assistantItem.children.some((child) => child.className === "assistant-sql"), "Clarification must not show SQL");
   assert(!assistantItem.children.some((child) => child.className === "assistant-copy"), "Clarification must not show Copy SQL");
+});
+
+Deno.test("assistant opens and X closes the entire panel", () => {
+  const { get } = setup();
+  const panel = get("#sql-assistant");
+  get("#assistant-launcher").listeners.click();
+  assert(!panel.hidden && panel.attributes["aria-hidden"] === "false", "Launcher should open the panel");
+  get("#assistant-close").listeners.click();
+  assert(panel.hidden && panel.attributes["aria-hidden"] === "true", "X should hide the panel");
+  assert(panel.attributes.inert === "", "Closed panel should be inert");
+});
+
+Deno.test("assistant launcher toggles open and closed without requests", () => {
+  const { get, requests } = setup();
+  const launcher = get("#assistant-launcher");
+  const panel = get("#sql-assistant");
+  launcher.listeners.click();
+  launcher.listeners.click();
+  assert(panel.hidden, "Second launcher click should close the panel");
+  assert(requests.length === 0, "Toggling must not make a network request");
+});
+
+Deno.test("closing and reopening preserves draft and conversation history", async () => {
+  const { app, get, requests, session } = setup();
+  await app.applySession(session);
+  const launcher = get("#assistant-launcher");
+  const panel = get("#sql-assistant");
+  launcher.listeners.click();
+  get("#assistant-input").value = "How many students are there?";
+  await app.generateAssistantSql(event);
+  const messageCount = get("#assistant-messages").children.length;
+  get("#assistant-input").value = "Keep this draft";
+  const requestCount = requests.length;
+  get("#assistant-close").listeners.click();
+  launcher.listeners.click();
+  assert(!panel.hidden, "Panel should reopen");
+  assert(get("#assistant-input").value === "Keep this draft", "Draft was lost while closed");
+  assert(get("#assistant-messages").children.length === messageCount, "Conversation history was lost while closed");
+  assert(requests.length === requestCount, "Toggling must not make another request");
+});
+
+Deno.test("switching quiz questions preserves assistant history", async () => {
+  const { app, get, session } = setup();
+  await app.applySession(session);
+  get("#assistant-launcher").listeners.click();
+  get("#assistant-input").value = "What does GROUP BY do?";
+  await app.generateAssistantSql(event);
+  const before = get("#assistant-messages").children.length;
+  app.renderQuiz("average-gpa");
+  assert(get("#assistant-messages").children.length === before, "Quiz navigation cleared assistant history");
+});
+
+Deno.test("response arriving while closed stays closed and is retained", async () => {
+  const response = deferred();
+  const { app, get, requests, session } = setup({ ragResponse: response.promise });
+  await app.applySession(session);
+  get("#assistant-launcher").listeners.click();
+  get("#assistant-input").value = "Count students";
+  const pending = app.generateAssistantSql(event);
+  get("#assistant-close").listeners.click();
+  assert(get("#sql-assistant").hidden, "Panel should remain closed while request is pending");
+  response.resolve({
+    data: { kind: "sql", sql: "SELECT COUNT(*) FROM students;", explanation: "Counts students.", sources: [] },
+    error: null,
+  });
+  await pending;
+  assert(get("#sql-assistant").hidden, "Response completion should not reopen the panel");
+  assert(requests.filter(([name]) => name === "rag-api").length === 1, "Expected exactly one request");
+  assert(get("#assistant-messages").children.length >= 2, "Completed response was not retained");
+});
+
+Deno.test("Escape closes the panel and returns focus to the launcher", () => {
+  const { get, focusedElement, pressKey } = setup();
+  const launcher = get("#assistant-launcher");
+  launcher.listeners.click();
+  pressKey("Escape");
+  assert(get("#sql-assistant").hidden, "Escape should close the panel");
+  assert(focusedElement() === launcher, "Escape should return focus to the launcher");
 });
 
 Deno.test("all five hints provide SQL guidance without solutions and display expected output values", async () => {

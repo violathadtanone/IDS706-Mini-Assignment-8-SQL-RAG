@@ -375,6 +375,11 @@ function setAssistantOpen(open) {
   assistantState.open = open;
   assistantPanel.hidden = !open;
   assistantPanel.setAttribute("aria-hidden", String(!open));
+  if (open) {
+    assistantPanel.removeAttribute("inert");
+  } else {
+    assistantPanel.setAttribute("inert", "");
+  }
   assistantLauncher.setAttribute("aria-expanded", String(open));
   if (open) {
     updateAssistantControls();
