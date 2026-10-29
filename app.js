@@ -215,7 +215,6 @@ const assistantMessages = document.querySelector("#assistant-messages");
 const assistantForm = document.querySelector("#assistant-form");
 const assistantInput = document.querySelector("#assistant-input");
 const assistantGenerate = document.querySelector("#assistant-generate");
-const assistantUseQuestion = document.querySelector("#assistant-use-question");
 const assistantState = {
   open: false,
   busy: false,
@@ -367,7 +366,6 @@ function updateAssistantControls() {
   const enabled = signedIn && !assistantState.busy;
   assistantInput.disabled = !signedIn || assistantState.busy;
   assistantGenerate.disabled = !enabled;
-  assistantUseQuestion.disabled = !enabled;
   assistantGenerate.textContent = assistantState.busy ? "Generating…" : "Generate SQL";
 }
 
@@ -471,11 +469,6 @@ async function generateAssistantSql(event) {
 assistantLauncher.addEventListener("click", () => setAssistantOpen(!assistantState.open));
 assistantClose.addEventListener("click", () => setAssistantOpen(false));
 assistantForm.addEventListener("submit", generateAssistantSql);
-assistantUseQuestion.addEventListener("click", () => {
-  const quiz = getCurrentQuiz();
-  assistantInput.value = quiz.title;
-  assistantInput.focus();
-});
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && assistantState.open) setAssistantOpen(false);
 });

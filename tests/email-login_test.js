@@ -286,7 +286,8 @@ Deno.test("signed-out direct JavaScript calls cannot run, check, invoke, or save
 Deno.test("signed-in assistant sends the current session token to rag-api", async () => {
   const { app, get, requests, session } = setup();
   await app.applySession(session);
-  get("#assistant-input").value = "How many students are there?";
+  const question = "List school names\nordered by student count\nwith a limit of 10.";
+  get("#assistant-input").value = question;
   await app.generateAssistantSql(event);
   const ragRequest = requests.find(([name]) => name === "rag-api");
   assert(ragRequest, "Expected rag-api request");
@@ -298,6 +299,7 @@ Deno.test("signed-in assistant sends the current session token to rag-api", asyn
     !ragRequest[1].headers.Authorization.includes("public-test-key"),
     "The anon key must not be used as the bearer token",
   );
+  assert(ragRequest[1].body.question === question, "Multiline question must be sent unchanged");
   assert(
     !get("#assistant-messages").children.some((child) => child.className === "assistant-sources"),
     "Retrieval sources must not be shown in the assistant UI",
@@ -320,6 +322,11 @@ Deno.test("signed-in assistant sends the current session token to rag-api", asyn
       assistantItem.children.findIndex((child) => child.className === "assistant-sql"),
     "SQL response headings must precede their content",
   );
+});
+
+Deno.test("assistant does not include the removed quiz-question shortcut", () => {
+  assert(!source.includes("assistant-use-question"), "Removed shortcut markup is still present");
+  assert(!source.includes("assistantUseQuestion"), "Removed shortcut handler is still present");
 });
 
 Deno.test("signed-out assistant does not invoke rag-api", async () => {

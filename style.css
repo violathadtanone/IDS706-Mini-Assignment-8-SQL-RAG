@@ -435,18 +435,19 @@ summary:focus-visible {
   box-shadow: 0 0 0 3px rgba(57, 136, 203, 0.12);
 }
 
+.assistant-input-help {
+  margin: 6px 1px 0;
+  color: #65788b;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 .assistant-form-actions {
   display: flex;
   gap: 8px;
   align-items: center;
   justify-content: space-between;
   margin-top: 8px;
-}
-
-.assistant-form-actions .text-button {
-  padding-left: 0;
-  font-size: 9px;
-  text-align: left;
 }
 
 .assistant-form-actions .button {
