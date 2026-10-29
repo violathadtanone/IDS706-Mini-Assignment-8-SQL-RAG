@@ -843,7 +843,7 @@ async function signInWithEmail(event) {
     const { error } = await client.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: "https://violathadtanone.github.io/IDS706-Major-Assignment-2-SQLQuiz/",
+        emailRedirectTo: "https://violathadtanone.github.io/IDS706-Mini-Assignment-8-SQL-RAG/",
       },
     });
     if (error) {

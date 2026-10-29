@@ -194,8 +194,8 @@ Deno.test("Magic Link request uses the exact quiz redirect; returned session unl
   const send = requests.find(([kind]) => kind === "send")[1];
   assert(send.email === session.user.email, "Wrong recipient");
   assert(
-    send.options.emailRedirectTo === "https://violathadtanone.github.io/IDS706-Major-Assignment-2-SQLQuiz/",
-    "Magic Link must return to the quiz project URL",
+    send.options.emailRedirectTo === "https://violathadtanone.github.io/IDS706-Mini-Assignment-8-SQL-RAG/",
+    "Magic Link must return to the new RAG project URL",
   );
   assert(get("#signin-message").textContent.includes("Magic Link"), "Missing link instructions");
   // Supabase URL detection/auth callbacks deliver this session on return.
