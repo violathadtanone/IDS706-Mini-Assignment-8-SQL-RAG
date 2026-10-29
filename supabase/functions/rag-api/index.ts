@@ -183,11 +183,17 @@ export async function handleRagRequest(req: Request, userId: string, deps: Depen
   }
 }
 
-export async function serveRagRequest(req: Request) {
+export function authenticatedUserId(context: { userClaims?: { id?: unknown } } | null | undefined) {
+  const id = context?.userClaims?.id;
+  return typeof id === "string" && id.trim() ? id : null;
+}
+
+export async function serveRagRequest(req: Request, authContext = createSupabaseContext) {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  const { data: context, error } = await createSupabaseContext(req, { auth: "user" });
-  if (error || !context?.userClaims?.sub) return json({ error: "A valid signed-in Supabase user is required." }, 401);
-  return handleRagRequest(req, context.userClaims.sub);
+  const { data: context, error } = await authContext(req, { auth: "user" });
+  const userId = authenticatedUserId(context);
+  if (error || !userId) return json({ error: "A valid signed-in Supabase user is required." }, 401);
+  return handleRagRequest(req, userId);
 }
 
 if (import.meta.main) Deno.serve(serveRagRequest);

@@ -393,6 +393,10 @@ async function generateAssistantSql(event) {
   renderAssistantMessages();
   updateAssistantControls();
   try {
+    const { data: sessionData, error: sessionError } = await client.auth.getSession();
+    if (sessionError || !sessionData.session?.access_token) {
+      throw new Error("Your sign-in session is unavailable. Sign in again.");
+    }
     const { data: payload, error } = await client.functions.invoke(functionName, {
       body: { question },
     });

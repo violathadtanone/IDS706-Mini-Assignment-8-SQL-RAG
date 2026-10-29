@@ -1,5 +1,5 @@
 import { assertEquals, assertFalse, assertStringIncludes } from "jsr:@std/assert@1";
-import { handleRagRequest, NEO4J_SEARCH, parseNeo4jRows } from "./index.ts";
+import { authenticatedUserId, handleRagRequest, NEO4J_SEARCH, parseNeo4jRows, serveRagRequest } from "./index.ts";
 
 function response(status: number, payload: unknown) {
   return new Response(JSON.stringify(payload), { status, headers: { "content-type": "application/json" } });
@@ -25,6 +25,22 @@ Deno.test("Neo4j query returns only id, text, and score", () => {
   assertEquals(parseNeo4jRows({ data: { fields: ["id", "text", "score"], values: [["x", "snippet", 0.4]] } }), [
     { id: "x", snippet: "snippet", score: 0.4 },
   ]);
+});
+
+Deno.test("Supabase user context uses userClaims.id", () => {
+  assertEquals(authenticatedUserId({ userClaims: { id: "user-123" } }), "user-123");
+  assertEquals(authenticatedUserId({ userClaims: { id: "  " } }), null);
+  assertEquals(authenticatedUserId({ userClaims: { id: undefined } }), null);
+  assertEquals(authenticatedUserId({ userClaims: {} }), null);
+});
+
+Deno.test("serveRagRequest accepts mocked authenticated context and rejects missing identity", async () => {
+  Deno.env.delete("RAG_OPENAI_API_KEY");
+  const request = new Request("http://local/generate", { method: "POST", body: JSON.stringify({ question: "test" }) });
+  const authenticated = await serveRagRequest(request, async () => ({ data: { userClaims: { id: "user-123" } }, error: null }) as any);
+  assertEquals(authenticated.status, 503);
+  const unauthenticated = await serveRagRequest(request, async () => ({ data: { userClaims: {} }, error: null }) as any);
+  assertEquals(unauthenticated.status, 401);
 });
 
 Deno.test("mocked flow embeds, retrieves, and generates without executing SQL", async () => {

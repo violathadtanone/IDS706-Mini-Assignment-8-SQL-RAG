@@ -7,8 +7,8 @@ authentication settings, or the submitted repository.
 ## Request flow
 
 1. Supabase verifies the signed-in user JWT before the handler and the handler
-   explicitly checks the user `sub` with `createSupabaseContext(..., { auth:
-   "user" })`.
+   explicitly checks `ctx.userClaims.id` from `createSupabaseContext(..., {
+   auth: "user" })`.
 2. The function embeds the question with `text-embedding-3-small` at 1536
    dimensions.
 3. It calls Neo4j Aura’s HTTPS Query API and the existing
