@@ -196,4 +196,13 @@ export async function serveRagRequest(req: Request, authContext = createSupabase
   return handleRagRequest(req, userId);
 }
 
-if (import.meta.main) Deno.serve(serveRagRequest);
+export function createProductionHandler(authContext = createSupabaseContext) {
+  return (req: Request) => serveRagRequest(req, authContext);
+}
+
+export function startRagServer(serve = Deno.serve, authContext = createSupabaseContext) {
+  const handler = createProductionHandler(authContext);
+  return serve((req: Request) => handler(req));
+}
+
+if (import.meta.main) startRagServer();

@@ -1,5 +1,5 @@
 import { assertEquals, assertFalse, assertStringIncludes } from "jsr:@std/assert@1";
-import { authenticatedUserId, handleRagRequest, NEO4J_SEARCH, parseNeo4jRows, serveRagRequest } from "./index.ts";
+import { authenticatedUserId, handleRagRequest, NEO4J_SEARCH, parseNeo4jRows, serveRagRequest, startRagServer } from "./index.ts";
 
 function response(status: number, payload: unknown) {
   return new Response(JSON.stringify(payload), { status, headers: { "content-type": "application/json" } });
@@ -41,6 +41,30 @@ Deno.test("serveRagRequest accepts mocked authenticated context and rejects miss
   assertEquals(authenticated.status, 503);
   const unauthenticated = await serveRagRequest(request, async () => ({ data: { userClaims: {} }, error: null }) as any);
   assertEquals(unauthenticated.status, 401);
+});
+
+Deno.test("production entrypoint ignores Deno request-info and preserves auth checks", async () => {
+  let productionHandler: ((request: Request) => Promise<Response>) | undefined;
+  const mockServe = (handler: (request: Request) => Promise<Response>) => {
+    productionHandler = handler;
+    return undefined;
+  };
+  const authenticatedContext = async () => ({ data: { userClaims: { id: "user-123" } }, error: null });
+  startRagServer(mockServe, authenticatedContext as any);
+  assert(productionHandler, "Deno.serve was not given a production handler");
+
+  const malformedRequest = new Request("http://local/generate", { method: "POST", body: "not-json" });
+  const authenticatedResponse = await (productionHandler as any)(malformedRequest, { remoteAddr: "mock-info" });
+  assertEquals(authenticatedResponse.status, 400);
+
+  const unauthenticatedContext = async () => ({ data: { userClaims: {} }, error: null });
+  let unauthenticatedHandler: ((request: Request) => Promise<Response>) | undefined;
+  startRagServer((handler) => {
+    unauthenticatedHandler = handler;
+    return undefined;
+  }, unauthenticatedContext as any);
+  const unauthenticatedResponse = await (unauthenticatedHandler as any)(new Request("http://local/generate", { method: "POST" }), { remoteAddr: "mock-info" });
+  assertEquals(unauthenticatedResponse.status, 401);
 });
 
 Deno.test("mocked flow embeds, retrieves, and generates without executing SQL", async () => {
