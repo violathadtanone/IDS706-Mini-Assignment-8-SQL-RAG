@@ -10,6 +10,14 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 64;
 const MAX_QUOTA_USERS = 5000;
 const REQUEST_TIMEOUT_MS = 15_000;
+const COMPLETE_DATASET_SCHEMA = `
+Authoritative complete schema for the three dataset tables:
+schools(school_id VARCHAR PRIMARY KEY, school_name VARCHAR, city VARCHAR, state VARCHAR, school_type VARCHAR)
+students(student_id VARCHAR PRIMARY KEY, first_name VARCHAR, last_name VARCHAR, grade_level VARCHAR, gpa NUMERIC, school_id VARCHAR REFERENCES schools.school_id)
+meals(meal_id VARCHAR PRIMARY KEY, student_id VARCHAR REFERENCES students.student_id, meal_date DATE, meal_item VARCHAR, price NUMERIC)
+Relationships: students.school_id joins schools.school_id; meals.student_id joins students.student_id.
+Business rule: the dataset represents students enrolled in a free lunch program.
+No other dataset tables or columns are confirmed by this schema. In particular, household income is not included.`;
 
 type Source = { id: string; snippet: string; score?: number };
 type AssistantResult = { kind: "sql" | "explanation" | "clarification"; sql: string; explanation: string };
@@ -158,6 +166,7 @@ export function parseAssistantResponse(payload: any): AssistantResult {
   if (!result || !["sql", "explanation", "clarification"].includes(result.kind) ||
       typeof result.sql !== "string" || typeof result.explanation !== "string" ||
       !result.explanation.trim() || (result.kind === "sql" && !result.sql.trim()) ||
+      (result.kind === "clarification" && result.sql.trim()) ||
       result.sql.length > 8000 || result.explanation.length > 1200) {
     throw new Error("The SQL assistant returned an invalid structured response.");
   }
@@ -179,10 +188,10 @@ async function generateSql(question: string, sources: Source[], apiKey: string, 
     instructions: `You are a concise PostgreSQL teaching assistant for a school-lunch dataset.
 Return JSON matching the supplied schema. Generate SQL and its brief plain-language explanation in this same response.
 Use PostgreSQL syntax. Support SELECT, WHERE, ORDER BY, LIMIT, DISTINCT, aggregates, GROUP BY, HAVING, JOINs, NULL handling, subqueries, CTEs, and basic window functions.
-For dataset questions, use only tables, columns, and business rules supported by the retrieved knowledge. Never invent schema. If required dataset information is missing, use kind "clarification", leave sql empty, and ask one concise question.
+For dataset questions, use only tables, columns, and business rules supported by the complete schema and retrieved knowledge. Never invent schema. The complete schema is authoritative: if a requested table or field is absent, use kind "clarification", leave sql empty, and state plainly that the requested data is not included and cannot be answered using these tables. Do not ask the user where an absent field is. Ask one concise question only when the schema itself does not determine a needed detail.
 For general SQL questions, use kind "explanation" and may include a small clearly hypothetical SQL example in sql; label hypothetical examples in explanation.
 For dataset SQL, use kind "sql". SQL must be read-only and must not be claimed executed or validated. Keep explanation under three sentences.`,
-    input: `Question:\n${question}\n\nRetrieved knowledge (ground dataset-specific claims in this context):\n${context}`.slice(0, 10000),
+    input: `Question:\n${question}\n\n${COMPLETE_DATASET_SCHEMA}\n\nRetrieved knowledge (use this to add relevant schema details and business rules):\n${context}`.slice(0, 10000),
     max_output_tokens: MAX_OUTPUT_TOKENS,
     text: {
       format: {

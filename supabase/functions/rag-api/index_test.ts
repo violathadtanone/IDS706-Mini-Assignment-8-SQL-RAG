@@ -128,6 +128,7 @@ Deno.test("one structured generation supports quiz, new dataset, general, and cl
     assertEquals(body.sql, expected.sql);
     assertEquals(body.explanation, expected.explanation);
     assertEquals(calls.filter((url) => url.endsWith("/responses")).length, 1);
+    assertStringIncludes(requestBodies[0].input, "household income is not included");
     assertStringIncludes(requestBodies[0].input, "schema-1");
     assertStringIncludes(requestBodies[0].input, "school_id");
   }

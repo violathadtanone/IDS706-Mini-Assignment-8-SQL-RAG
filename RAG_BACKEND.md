@@ -20,8 +20,10 @@ authentication settings, or the submitted repository.
    `kind` (`sql`, `explanation`, or `clarification`), PostgreSQL `sql`, and a
    brief `explanation`. The output budget is capped at 350 tokens.
 5. It returns the structured result plus retrieval metadata for internal
-   debugging/tests. The frontend does not display that metadata. Generated
-   SQL is never executed or claimed to be validated.
+   debugging/tests. The frontend presents `Response` above the explanation.
+   It presents `Generated SQL` directly above SQL only; clarification and
+   unavailable-data responses omit the SQL heading, code block, and Copy SQL
+   button. Generated SQL is never executed or claimed to be validated.
 
 The browser sends only `{ "question": "..." }` through
 `supabase.functions.invoke("rag-api", ...)`. OpenAI and Neo4j credentials are
@@ -67,10 +69,13 @@ submissions, keeps the SQL code block and Copy SQL button, and renders the
 explanation and SQL with text nodes. Retrieval sources are not shown in the
 user interface.
 
-Dataset-specific SQL must be grounded in retrieved schema and business rules.
-General PostgreSQL explanations may use the model’s general knowledge and
-clearly label hypothetical tables or columns. The current knowledge index is
-still used for every request; no hardcoded answer menu replaces retrieval.
+Dataset-specific SQL must be grounded in the complete compact schema and
+retrieved schema/business rules. The complete schema establishes that
+`household income` is absent, so the assistant returns an unavailable-data
+explanation instead of asking for a column name or inventing SQL. General
+PostgreSQL explanations may use the model’s general knowledge and clearly
+label hypothetical tables or columns. The current knowledge index is still
+used for every request; no hardcoded answer menu replaces retrieval.
 
 No additional Neo4j knowledge ingestion is included in this change. General
 SQL concepts do not require new stored vectors, while dataset-specific

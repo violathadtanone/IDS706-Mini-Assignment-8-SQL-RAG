@@ -291,6 +291,13 @@ Deno.test("signed-in assistant sends the current session token to rag-api", asyn
     assistantItem?.children.some((child) => child.className === "assistant-explanation"),
     "Generated explanation must be visible",
   );
+  assert(
+    assistantItem.children.findIndex((child) => child.className === "assistant-response-heading") <
+      assistantItem.children.findIndex((child) => child.className === "assistant-explanation") &&
+      assistantItem.children.findIndex((child) => child.className === "assistant-sql-heading") <
+      assistantItem.children.findIndex((child) => child.className === "assistant-sql"),
+    "SQL response headings must precede their content",
+  );
 });
 
 Deno.test("signed-out assistant does not invoke rag-api", async () => {
@@ -320,6 +327,28 @@ Deno.test("assistant renders model content as text, not HTML", async () => {
   const explanation = assistantItem.children.find((child) => child.className === "assistant-explanation");
   assert(code.textContent === "<script>bad()</script>", "SQL must be rendered as text");
   assert(explanation.textContent === "<b>plain text</b>", "Explanation must be rendered as text");
+});
+
+Deno.test("unavailable dataset responses show only the Response layout", async () => {
+  const { app, get, session } = setup({
+    ragPayload: {
+      kind: "clarification",
+      sql: "",
+      explanation: "Household income is not included in this dataset, so this question cannot be answered using the available tables.",
+      sources: [{ id: "schema", snippet: "hidden" }],
+    },
+  });
+  await app.applySession(session);
+  get("#assistant-input").value = "List students whose household income is below $30,000.";
+  await app.generateAssistantSql(event);
+  const assistantItem = get("#assistant-messages").children.find((child) =>
+    String(child.className).includes("assistant-message is-assistant")
+  );
+  assert(assistantItem.children.some((child) => child.className === "assistant-response-heading"), "Response heading is missing");
+  assert(assistantItem.children.some((child) => child.className === "assistant-explanation"), "Unavailable-data explanation is missing");
+  assert(!assistantItem.children.some((child) => child.className === "assistant-sql-heading"), "Clarification must not show SQL heading");
+  assert(!assistantItem.children.some((child) => child.className === "assistant-sql"), "Clarification must not show SQL");
+  assert(!assistantItem.children.some((child) => child.className === "assistant-copy"), "Clarification must not show Copy SQL");
 });
 
 Deno.test("all five hints provide SQL guidance without solutions and display expected output values", async () => {

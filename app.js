@@ -277,9 +277,18 @@ function renderAssistantMessages() {
   for (const message of assistantState.messages) {
     const item = document.createElement("article");
     item.className = `assistant-message is-${message.role}${message.error ? " is-error" : ""}`;
-    const text = document.createElement("span");
-    text.textContent = message.text;
-    item.append(text);
+    if (message.text) {
+      const text = document.createElement("span");
+      text.textContent = message.text;
+      item.append(text);
+    }
+
+    if (message.role === "assistant" && !message.error) {
+      const responseHeading = document.createElement("strong");
+      responseHeading.className = "assistant-response-heading";
+      responseHeading.textContent = "Response";
+      item.append(responseHeading);
+    }
 
     if (message.explanation) {
       const explanation = document.createElement("p");
@@ -289,6 +298,11 @@ function renderAssistantMessages() {
     }
 
     if (message.sql) {
+      const sqlHeading = document.createElement("strong");
+      sqlHeading.className = "assistant-sql-heading";
+      sqlHeading.textContent = "Generated SQL";
+      item.append(sqlHeading);
+
       const code = document.createElement("pre");
       code.className = "assistant-sql";
       code.textContent = message.sql;
@@ -399,8 +413,7 @@ async function generateAssistantSql(event) {
     }
     addAssistantMessage({
       role: "assistant",
-      text: payload.kind === "clarification" ? "I need one detail before writing SQL:" :
-        payload.kind === "explanation" ? "SQL explanation:" : "Generated SQL:",
+      text: "",
       sql: payload.sql,
       explanation: payload.explanation,
     });

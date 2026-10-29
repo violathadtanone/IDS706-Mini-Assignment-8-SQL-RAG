@@ -310,6 +310,14 @@ summary:focus-visible {
   background: #fff8f6;
 }
 
+.assistant-response-heading,
+.assistant-sql-heading {
+  color: var(--navy);
+  font-size: 10px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
 .assistant-explanation {
   margin: 0;
   color: var(--ink-soft);
