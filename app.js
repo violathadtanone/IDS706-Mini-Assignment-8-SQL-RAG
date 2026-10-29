@@ -281,6 +281,13 @@ function renderAssistantMessages() {
     text.textContent = message.text;
     item.append(text);
 
+    if (message.explanation) {
+      const explanation = document.createElement("p");
+      explanation.className = "assistant-explanation";
+      explanation.textContent = message.explanation;
+      item.append(explanation);
+    }
+
     if (message.sql) {
       const code = document.createElement("pre");
       code.className = "assistant-sql";
@@ -300,25 +307,6 @@ function renderAssistantMessages() {
         }
       });
       item.append(copyButton);
-    }
-
-    if (Array.isArray(message.sources) && message.sources.length > 0) {
-      const details = document.createElement("details");
-      details.className = "assistant-sources";
-      const summary = document.createElement("summary");
-      summary.textContent = `Sources (${message.sources.length})`;
-      details.append(summary);
-      for (const source of message.sources) {
-        const sourceItem = document.createElement("div");
-        sourceItem.className = "assistant-source";
-        const sourceId = document.createElement("strong");
-        sourceId.textContent = String(source.id ?? "Knowledge source");
-        const snippet = document.createElement("span");
-        snippet.textContent = ` — ${String(source.snippet ?? "")}`;
-        sourceItem.append(sourceId, snippet);
-        details.append(sourceItem);
-      }
-      item.append(details);
     }
     assistantMessages.append(item);
   }
@@ -405,14 +393,16 @@ async function generateAssistantSql(event) {
     });
     if (error) throw new Error(error.message || "The SQL assistant is unavailable. Try again later.");
     if (requestId !== assistantState.requestId) return;
-    if (typeof payload.sql !== "string" || !Array.isArray(payload.sources)) {
+    if (!payload || !["sql", "explanation", "clarification"].includes(payload.kind) ||
+        typeof payload.sql !== "string" || typeof payload.explanation !== "string") {
       throw new Error("The SQL assistant returned an invalid response.");
     }
     addAssistantMessage({
       role: "assistant",
-      text: "Generated SQL:",
+      text: payload.kind === "clarification" ? "I need one detail before writing SQL:" :
+        payload.kind === "explanation" ? "SQL explanation:" : "Generated SQL:",
       sql: payload.sql,
-      sources: payload.sources,
+      explanation: payload.explanation,
     });
   } catch (error) {
     if (requestId === assistantState.requestId) {

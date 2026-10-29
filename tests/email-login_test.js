@@ -30,7 +30,7 @@ function deferred() {
 }
 
 function setup(
-  { sendError = null, loggingError = null, invokeHook = null, bootstrap = false } = {},
+  { sendError = null, loggingError = null, invokeHook = null, bootstrap = false, ragPayload = null } = {},
 ) {
   const nodes = new Map();
   function element() {
@@ -94,7 +94,15 @@ function setup(
       async invoke(name, { body, headers }) {
         if (name === "rag-api") {
           requests.push([name, { body, headers }]);
-          return { data: { sql: "SELECT COUNT(*) FROM students;", sources: [] }, error: null };
+          return {
+            data: ragPayload ?? {
+              kind: "sql",
+              sql: "SELECT COUNT(*) FROM students;",
+              explanation: "Counts the rows in students.",
+              sources: [{ id: "schema-1", snippet: "hidden retrieval metadata" }],
+            },
+            error: null,
+          };
         }
         assert(name === "quiz-api", "Unexpected function");
         requests.push([body.action, body]);
@@ -268,6 +276,21 @@ Deno.test("signed-in assistant sends the current session token to rag-api", asyn
     !ragRequest[1].headers.Authorization.includes("public-test-key"),
     "The anon key must not be used as the bearer token",
   );
+  assert(
+    !get("#assistant-messages").children.some((child) => child.className === "assistant-sources"),
+    "Retrieval sources must not be shown in the assistant UI",
+  );
+  const assistantItem = get("#assistant-messages").children.find((child) =>
+    String(child.className).includes("assistant-message is-assistant")
+  );
+  assert(
+    assistantItem?.children.some((child) => child.className === "assistant-sql"),
+    "Generated SQL must remain visible as a code block",
+  );
+  assert(
+    assistantItem?.children.some((child) => child.className === "assistant-explanation"),
+    "Generated explanation must be visible",
+  );
 });
 
 Deno.test("signed-out assistant does not invoke rag-api", async () => {
@@ -276,6 +299,27 @@ Deno.test("signed-out assistant does not invoke rag-api", async () => {
   await app.generateAssistantSql(event);
   assert(!requests.some(([name]) => name === "rag-api"), "Signed-out assistant sent a request");
   assert(get("#assistant-messages").children.length > 0, "Signed-out prompt was not rendered");
+});
+
+Deno.test("assistant renders model content as text, not HTML", async () => {
+  const { app, get, session } = setup({
+    ragPayload: {
+      kind: "sql",
+      sql: "<script>bad()</script>",
+      explanation: "<b>plain text</b>",
+      sources: [],
+    },
+  });
+  await app.applySession(session);
+  get("#assistant-input").value = "Explain this query";
+  await app.generateAssistantSql(event);
+  const assistantItem = get("#assistant-messages").children.find((child) =>
+    String(child.className).includes("assistant-message is-assistant")
+  );
+  const code = assistantItem.children.find((child) => child.className === "assistant-sql");
+  const explanation = assistantItem.children.find((child) => child.className === "assistant-explanation");
+  assert(code.textContent === "<script>bad()</script>", "SQL must be rendered as text");
+  assert(explanation.textContent === "<b>plain text</b>", "Explanation must be rendered as text");
 });
 
 Deno.test("all five hints provide SQL guidance without solutions and display expected output values", async () => {

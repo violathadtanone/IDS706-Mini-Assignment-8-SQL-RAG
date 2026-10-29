@@ -310,6 +310,13 @@ summary:focus-visible {
   background: #fff8f6;
 }
 
+.assistant-explanation {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .assistant-sql {
   overflow-x: auto;
   margin: 4px 0 0;
@@ -332,29 +339,6 @@ summary:focus-visible {
   cursor: pointer;
   font-size: 10px;
   font-weight: 700;
-}
-
-.assistant-sources {
-  margin-top: 2px;
-  border-top: 1px solid #e6eef5;
-}
-
-.assistant-sources summary {
-  padding-top: 7px;
-  color: var(--blue);
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.assistant-source {
-  margin-top: 7px;
-  color: var(--muted);
-  font-size: 9px;
-}
-
-.assistant-source strong {
-  color: var(--navy);
 }
 
 .assistant-form {

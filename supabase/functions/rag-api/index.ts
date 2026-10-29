@@ -3,8 +3,8 @@ import { createSupabaseContext } from "npm:@supabase/server@1";
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
 const NEO4J_INDEX = "knowledge_embeddings";
-const TOP_K = 3;
-const MAX_OUTPUT_TOKENS = 250;
+const TOP_K = 5;
+const MAX_OUTPUT_TOKENS = 350;
 const MAX_QUESTION_LENGTH = 2000;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 64;
@@ -12,6 +12,7 @@ const MAX_QUOTA_USERS = 5000;
 const REQUEST_TIMEOUT_MS = 15_000;
 
 type Source = { id: string; snippet: string; score?: number };
+type AssistantResult = { kind: "sql" | "explanation" | "clarification"; sql: string; explanation: string };
 type EmbeddingEntry = { embedding: number[]; expiresAt: number };
 type Dependencies = { fetchImpl?: typeof fetch; now?: () => number };
 
@@ -146,17 +147,62 @@ function responseText(payload: any): string {
     .map((item: any) => item.text).join("\n").trim();
 }
 
+export function parseAssistantResponse(payload: any): AssistantResult {
+  const raw = responseText(payload);
+  let result: any;
+  try {
+    result = JSON.parse(raw);
+  } catch {
+    throw new Error("The SQL assistant returned malformed structured output.");
+  }
+  if (!result || !["sql", "explanation", "clarification"].includes(result.kind) ||
+      typeof result.sql !== "string" || typeof result.explanation !== "string" ||
+      !result.explanation.trim() || (result.kind === "sql" && !result.sql.trim()) ||
+      result.sql.length > 8000 || result.explanation.length > 1200) {
+    throw new Error("The SQL assistant returned an invalid structured response.");
+  }
+  return {
+    kind: result.kind,
+    sql: result.sql.trim(),
+    explanation: result.explanation.trim(),
+  };
+}
+
+export function buildGenerationContext(sources: Source[]) {
+  return sources.map((source, index) => `[${index + 1}] ${source.id}: ${source.snippet}`).join("\n");
+}
+
 async function generateSql(question: string, sources: Source[], apiKey: string, model: string, fetchImpl: typeof fetch) {
-  const context = sources.map((source, index) => `[${index + 1}] ${source.id}: ${source.snippet}`).join("\n");
+  const context = buildGenerationContext(sources);
   const payload = await openaiJson("responses", {
     model,
-    instructions: "Return only safe PostgreSQL SQL. Do not execute it. Use the supplied knowledge.",
-    input: `Question: ${question}\nKnowledge:\n${context}`.slice(0, 9000),
+    instructions: `You are a concise PostgreSQL teaching assistant for a school-lunch dataset.
+Return JSON matching the supplied schema. Generate SQL and its brief plain-language explanation in this same response.
+Use PostgreSQL syntax. Support SELECT, WHERE, ORDER BY, LIMIT, DISTINCT, aggregates, GROUP BY, HAVING, JOINs, NULL handling, subqueries, CTEs, and basic window functions.
+For dataset questions, use only tables, columns, and business rules supported by the retrieved knowledge. Never invent schema. If required dataset information is missing, use kind "clarification", leave sql empty, and ask one concise question.
+For general SQL questions, use kind "explanation" and may include a small clearly hypothetical SQL example in sql; label hypothetical examples in explanation.
+For dataset SQL, use kind "sql". SQL must be read-only and must not be claimed executed or validated. Keep explanation under three sentences.`,
+    input: `Question:\n${question}\n\nRetrieved knowledge (ground dataset-specific claims in this context):\n${context}`.slice(0, 10000),
     max_output_tokens: MAX_OUTPUT_TOKENS,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "sql_assistant_response",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            kind: { type: "string", enum: ["sql", "explanation", "clarification"] },
+            sql: { type: "string" },
+            explanation: { type: "string" },
+          },
+          required: ["kind", "sql", "explanation"],
+        },
+      },
+    },
   }, apiKey, fetchImpl);
-  const sql = responseText(payload);
-  if (!sql) throw new Error("The SQL generation response was empty.");
-  return sql;
+  return parseAssistantResponse(payload);
 }
 
 export async function handleRagRequest(req: Request, userId: string, deps: Dependencies = {}) {
@@ -175,8 +221,8 @@ export async function handleRagRequest(req: Request, userId: string, deps: Depen
   try {
     const embedding = await getEmbedding(question, apiKey, fetchImpl, now);
     const sources = await retrieveSources(embedding, fetchImpl);
-    const sql = await generateSql(question, sources, apiKey, env("RAG_OPENAI_SQL_MODEL") || "gpt-6-luna", fetchImpl);
-    return json({ sql, sources });
+    const result = await generateSql(question, sources, apiKey, env("RAG_OPENAI_SQL_MODEL") || "gpt-6-luna", fetchImpl);
+    return json({ ...result, sources });
   } catch (error) {
     console.error(error instanceof Error ? error.message : "RAG request failed");
     return json({ error: "The SQL assistant is unavailable. Try again later." }, 502);

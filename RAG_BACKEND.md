@@ -12,12 +12,16 @@ authentication settings, or the submitted repository.
 2. The function embeds the question with `text-embedding-3-small` at 1536
    dimensions.
 3. It calls Neo4j Aura’s HTTPS Query API and the existing
-   `knowledge_embeddings` index. The Cypher result is limited to `node.id`,
-   `node.text`, and `score`; it never returns `properties(node)` or the stored
-   embedding.
-4. It sends the short retrieved context to OpenAI Responses with the
-   server-configured model and `max_output_tokens: 250`.
-5. It returns SQL and source IDs/snippets. Generated SQL is never executed.
+   `knowledge_embeddings` index, retrieving up to five relevant Knowledge
+   nodes. The Cypher result is limited to `node.id`, `node.text`, and `score`;
+   it never returns `properties(node)` or the stored embedding.
+4. It sends the short retrieved context to one OpenAI Responses request with
+   the server-configured model and a strict JSON schema. The response contains
+   `kind` (`sql`, `explanation`, or `clarification`), PostgreSQL `sql`, and a
+   brief `explanation`. The output budget is capped at 350 tokens.
+5. It returns the structured result plus retrieval metadata for internal
+   debugging/tests. The frontend does not display that metadata. Generated
+   SQL is never executed or claimed to be validated.
 
 The browser sends only `{ "question": "..." }` through
 `supabase.functions.invoke("rag-api", ...)`. OpenAI and Neo4j credentials are
@@ -57,19 +61,33 @@ or restarts and are not shared across workers, regions, or concurrent
 isolates. A durable global limit would require shared rate-limit storage,
 which is intentionally not added here.
 
-The frontend makes no request on page load, panel open, or typing. It sends a
-request only after the user submits, prevents duplicate submissions, and
-renders all user text, source snippets, and SQL with text nodes.
+The frontend makes no request on page load, panel open, typing, or navigation.
+It sends a request only after the user submits, prevents duplicate
+submissions, keeps the SQL code block and Copy SQL button, and renders the
+explanation and SQL with text nodes. Retrieval sources are not shown in the
+user interface.
+
+Dataset-specific SQL must be grounded in retrieved schema and business rules.
+General PostgreSQL explanations may use the model’s general knowledge and
+clearly label hypothetical tables or columns. The current knowledge index is
+still used for every request; no hardcoded answer menu replaces retrieval.
+
+No additional Neo4j knowledge ingestion is included in this change. General
+SQL concepts do not require new stored vectors, while dataset-specific
+questions continue to depend on the existing `Knowledge` entries and index.
 
 ## Local mocked checks
 
 With Deno installed, run from the repository root:
 
 ```bash
-deno test --allow-env supabase/functions/rag-api/index_test.ts
+deno test --allow-env supabase/functions/rag-api/index_test.ts tests/email-login_test.js
 ```
 
-The tests use mocked OpenAI and Neo4j responses. They do not contact live
+The tests use mocked OpenAI and Neo4j responses and cover existing quiz
+questions, new dataset questions, general SQL explanations, missing-column
+clarifications, retrieval context forwarding, structured-output validation,
+and the absence of a second explanation request. They do not contact live
 services, execute generated SQL, deploy the function, or set remote secrets.
 The existing Python terminal pipeline remains available in
 [sql_rag.py](./sql_rag.py); its local embedding cache remains ignored.
