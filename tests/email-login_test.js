@@ -30,7 +30,7 @@ function deferred() {
 }
 
 function setup(
-  { sendError = null, loggingError = null, invokeHook = null, bootstrap = false, ragPayload = null } = {},
+  { sendError = null, loggingError = null, invokeHook = null, bootstrap = false, ragPayload = null, clipboardError = null } = {},
 ) {
   const nodes = new Map();
   function element() {
@@ -77,6 +77,15 @@ function setup(
   const requests = [];
   const saved = new Map();
   const session = makeSession();
+  const clipboardWrites = [];
+  const navigatorMock = {
+    clipboard: {
+      async writeText(text) {
+        clipboardWrites.push(text);
+        if (clipboardError) throw clipboardError;
+      },
+    },
+  };
   const sdkClient = {
     auth: {
       onAuthStateChange(callback) { authCallback = callback; },
@@ -138,6 +147,7 @@ function setup(
     "window",
     "localStorage",
     "Response",
+    "navigator",
     source + `
     return { signInWithEmail, applySession, generateAssistantSql,
       runQuery, saveQuiz, checkAnswer, answersMatch, invokeApi, renderQuiz, quizzes, questionIds, loadSavedProgress,
@@ -152,12 +162,13 @@ function setup(
       clientOptions = options;
       return sdkClient;
     } },
-  } : {}, { getItem: () => null }, Response);
+    setTimeout,
+  } : { setTimeout }, { getItem: () => null }, Response, navigatorMock);
   if (!bootstrap) app.useClient(sdkClient);
   const get = (selector) => document.querySelector(selector);
   get("#signin-email").value = session.user.email;
   get("#signin-dialog").open = true;
-  return { app, get, requests, session, clientOptions,
+  return { app, get, requests, session, clientOptions, clipboardWrites,
     restoreSession(value) { restoredSession.resolve({ data: { session: value }, error: null }); },
     emitAuth(event, value) { authCallback(event, value); },
   };
@@ -327,6 +338,46 @@ Deno.test("assistant renders model content as text, not HTML", async () => {
   const explanation = assistantItem.children.find((child) => child.className === "assistant-explanation");
   assert(code.textContent === "<script>bad()</script>", "SQL must be rendered as text");
   assert(explanation.textContent === "<b>plain text</b>", "Explanation must be rendered as text");
+});
+
+Deno.test("copy icon preserves SQL line breaks and announces success", async () => {
+  const { app, get, session, clipboardWrites } = setup({
+    ragPayload: {
+      kind: "sql",
+      sql: "SELECT city, COUNT(*)\nFROM schools\nGROUP BY city;",
+      explanation: "Counts schools by city.",
+      sources: [],
+    },
+  });
+  await app.applySession(session);
+  get("#assistant-input").value = "Count schools by city";
+  await app.generateAssistantSql(event);
+  const assistantItem = get("#assistant-messages").children.find((child) =>
+    String(child.className).includes("assistant-message is-assistant")
+  );
+  const copyButton = assistantItem.children.find((child) => child.className === "assistant-copy");
+  const status = assistantItem.children.find((child) => child.className === "assistant-copy-status");
+  assert(copyButton.attributes["aria-label"] === "Copy SQL", "Copy icon needs an accessible label");
+  assert(copyButton.title === "Copy SQL", "Copy icon needs a tooltip");
+  assert(copyButton.innerHTML.includes("<svg"), "Copy control must use an inline SVG");
+  await copyButton.listeners.click();
+  assert(clipboardWrites[0] === "SELECT city, COUNT(*)\nFROM schools\nGROUP BY city;", "Clipboard text must preserve SQL line breaks");
+  assert(copyButton.innerHTML.includes("<path"), "Successful copy must show the checkmark state");
+  assert(status.textContent === "Copied", "Successful copy must announce Copied");
+});
+
+Deno.test("clipboard failure shows a clear message", async () => {
+  const { app, get, session } = setup({ clipboardError: new Error("clipboard unavailable") });
+  await app.applySession(session);
+  get("#assistant-input").value = "Count students";
+  await app.generateAssistantSql(event);
+  const assistantItem = get("#assistant-messages").children.find((child) =>
+    String(child.className).includes("assistant-message is-assistant")
+  );
+  const copyButton = assistantItem.children.find((child) => child.className === "assistant-copy");
+  const status = assistantItem.children.find((child) => String(child.className).includes("assistant-copy-status"));
+  await copyButton.listeners.click();
+  assert(status.textContent.includes("Could not copy SQL"), "Clipboard failure message is missing");
 });
 
 Deno.test("unavailable dataset responses show only the Response layout", async () => {

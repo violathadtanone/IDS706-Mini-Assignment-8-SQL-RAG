@@ -325,10 +325,14 @@ summary:focus-visible {
   line-height: 1.5;
 }
 
+.assistant-sql-shell {
+  position: relative;
+}
+
 .assistant-sql {
   overflow-x: auto;
   margin: 4px 0 0;
-  padding: 10px;
+  padding: 31px 10px 10px;
   border-radius: 6px;
   background: #122a49;
   color: #e8f4ff;
@@ -339,14 +343,68 @@ summary:focus-visible {
 }
 
 .assistant-copy {
-  justify-self: start;
-  padding: 4px 0;
-  border: 0;
-  background: transparent;
-  color: var(--blue);
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  display: grid;
+  width: 26px;
+  height: 24px;
+  place-items: center;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: rgba(232, 244, 255, .08);
+  color: #b9d8ee;
   cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.assistant-copy:hover {
+  border-color: rgba(185, 216, 238, .55);
+  background: rgba(232, 244, 255, .18);
+  color: #fff;
+}
+
+.assistant-copy:focus-visible {
+  outline: 2px solid #8bd3ff;
+  outline-offset: 2px;
+}
+
+.assistant-copy.is-copied {
+  color: #9de0b0;
+}
+
+.assistant-copy svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.assistant-copy-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.assistant-copy-status.is-error {
+  position: static;
+  display: block;
+  width: auto;
+  height: auto;
+  margin: 5px 10px 0;
+  overflow: visible;
+  clip: auto;
+  color: #ffd1c8;
   font-size: 10px;
-  font-weight: 700;
 }
 
 .assistant-form {

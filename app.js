@@ -303,24 +303,53 @@ function renderAssistantMessages() {
       sqlHeading.textContent = "Generated SQL";
       item.append(sqlHeading);
 
+      const sqlShell = document.createElement("div");
+      sqlShell.className = "assistant-sql-shell";
       const code = document.createElement("pre");
       code.className = "assistant-sql";
       code.textContent = message.sql;
-      item.append(code);
+      sqlShell.append(code);
 
       const copyButton = document.createElement("button");
       copyButton.className = "assistant-copy";
       copyButton.type = "button";
-      copyButton.textContent = "Copy SQL";
+      copyButton.setAttribute("aria-label", "Copy SQL");
+      copyButton.title = "Copy SQL";
+      copyButton.innerHTML = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="8" y="4" width="11" height="13" rx="2"></rect>
+          <rect x="5" y="7" width="11" height="13" rx="2"></rect>
+        </svg>`;
+      const copyStatus = document.createElement("span");
+      copyStatus.className = "assistant-copy-status";
+      copyStatus.setAttribute("role", "status");
+      copyStatus.setAttribute("aria-live", "polite");
       copyButton.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(message.sql);
-          copyButton.textContent = "Copied";
+          copyButton.classList.add("is-copied");
+          copyButton.innerHTML = `
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="m5 12 4 4L19 6"></path>
+            </svg>`;
+          copyStatus.classList.remove("is-error");
+          copyStatus.textContent = "Copied";
+          window.setTimeout(() => {
+            copyButton.classList.remove("is-copied");
+            copyButton.innerHTML = `
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <rect x="8" y="4" width="11" height="13" rx="2"></rect>
+                <rect x="5" y="7" width="11" height="13" rx="2"></rect>
+              </svg>`;
+            copyStatus.textContent = "";
+          }, 1400);
         } catch {
-          copyButton.textContent = "Copy unavailable";
+          copyStatus.classList.add("is-error");
+          copyStatus.textContent = "Could not copy SQL. Please copy it manually.";
         }
       });
-      item.append(copyButton);
+      sqlShell.append(copyButton, copyStatus);
+      item.append(sqlShell);
     }
     assistantMessages.append(item);
   }
