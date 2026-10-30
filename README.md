@@ -184,8 +184,8 @@ The project uses the following setup:
 8. Save quiz progress while signed in.
 
 ## SQL Assistant Instructions
-1. Click "Ask SQL Assistant" to open the chat
-2. Enter your question, including the required columns, filters, sorting, and row limit.
+1. Click "Ask SQL Assistant" to open the chat.
+2. Enter your question, including the required columns, filters, sorting, and row limit. General questions is set as a default option.
 3. Click "Generate SQL" to receive SQL, an explanation, and automatically executed query results.
 
 <p align="center">
@@ -193,7 +193,7 @@ The project uses the following setup:
   <img src="images/sqlquiz-2.png" width="45%">
 </p>
 
-4. Under Validate against option can also be used by selecting a particular quiz question or General question.
+4. For the additional feature,  "Validate against" drop down option can also be used by selecting a particular quiz question.
 5. If a quiz question was selected, the agent compares whether the results match its expected answer.
 <p align="center">
   <img src="images/sqlquiz-3.png" width="45%">
