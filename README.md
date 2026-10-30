@@ -139,11 +139,11 @@ python -m pip install -r requirements.txt
 
 ![Diagram](images/project-architecture.png)
 The project uses the following setup:
-- Local development: query.py connects to the hosted PostgreSQL database using credentials stored in .env. The connection uses the Supabase Session Pooler with sslmode=require.
-- Supabase: PostgreSQL stores the schools, students, and meals tables. Supabase also provides authentication and the backend used to run and save quiz queries.
-- GitHub: GitHub Pages hosts the quiz website, while GitHub Actions verifies that the hosted database is reachable using a GitHub Secret.
-- Neo4j: Neo4j stores knowledge about the dataset and retrieves relevant context. 
-- OpenAI: OpenAI uses that context from Neo4j to generate SQL queries and explanations.
+- **Local development**: query.py connects to the hosted PostgreSQL database using credentials stored in .env. The connection uses the Supabase Session Pooler with sslmode=require.
+- **Supabase**: PostgreSQL stores the schools, students, and meals tables. Supabase also provides authentication and the backend used to run and save quiz queries.
+- **GitHub**: GitHub Pages hosts the quiz website, while GitHub Actions verifies that the hosted database is reachable using a GitHub Secret.
+- **Neo4j**: Neo4j stores knowledge about the dataset and retrieves relevant context. 
+- **OpenAI**: OpenAI uses that context from Neo4j to generate SQL queries and explanations.
 
 
 ### 1. Authentication
@@ -161,7 +161,7 @@ The project uses the following setup:
 - For each user question, the application retrieves relevant knowledge from Neo4j and passes it to OpenAI to help generate SQL.
 - Workflow: User question → Vector retrieval → AI model → Generated SQL.
 
-### 4. AI API
+### 4. OpenAI API
 - OpenAI generates SQL queries and brief explanations using the user’s question and retrieved knowledge.
 - API key is stored securely in Supabase secrets for the deployed application and .env for local testing.
 - Generated SQL runs with read-only access, and results can be checked against the selected quiz’s expected answer.
