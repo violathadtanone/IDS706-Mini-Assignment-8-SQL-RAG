@@ -40,7 +40,7 @@ IDS706-Major-Assignment-2-SQLQuiz/
 - Hints are available for guidance
 - Grading is based on the results returned by each query
 - Sign-in is required to begin the quiz.
-- Link access to SQL Quiz: https://violathadtanone.github.io/IDS706-Major-Assignment-2-SQLQuiz/
+- Link access to SQL Quiz: https://violathadtanone.github.io/IDS706-Mini-Assignment-8-SQL-RAG/#
 <br><br>
 
 ## Overall Setup Instructions
@@ -77,7 +77,7 @@ python -m pip install --upgrade pip
 ## Environment Setup Instructions - Create pre-requisite files
 
 ### 1. .env
-- This stores the database connection settings used by the local Python script (query.py). The live quiz uses separate Supabase configuration and secrets.
+- This stores the PostgreSQL, Neo4j, and OpenAI connection settings and credentials used by the local Python scripts (query.py and sql_rag.py). The live quiz uses separate Supabase configuration and secrets.
 - After creating the Supabase database, open the Session Pooler connection details in Supabase and use those values to fill in the value based on the format below:
 ```
 POSTGRES_DB=postgres
@@ -86,6 +86,13 @@ POSTGRES_PASSWORD=<your-database-password>
 DB_HOST=aws-0-<your-region>.pooler.supabase.com
 DB_PORT=5432
 DB_SSLMODE=require
+NEO4J_URI=neo4j+s://<your-instance-host>.databases.neo4j.io
+NEO4J_USERNAME=<your-neo4j-username>
+NEO4J_PASSWORD=<your-neo4j-password>
+NEO4J_DATABASE=<your-database-name>
+AURA_INSTANCEID=<your-instance-id>
+AURA_INSTANCENAME=Free instance
+OPENAI_API_KEY=<your-openai-api-key>
 ```
 
 ### 2. init.sql
