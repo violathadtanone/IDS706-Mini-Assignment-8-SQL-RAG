@@ -168,12 +168,13 @@ function setup(
   `,
   )(document, bootstrap ? {
     SUPABASE_CONFIG: { url: "https://example.supabase.co", anonKey: "public-test-key" },
+    RAG_CONFIG: { functionName: "rag-api" },
     supabase: { createClient(_url, _key, options) {
       clientOptions = options;
       return sdkClient;
     } },
     setTimeout,
-  } : { setTimeout }, { getItem: () => null }, Response, navigatorMock);
+  } : { setTimeout, RAG_CONFIG: { functionName: "rag-api" } }, { getItem: () => null }, Response, navigatorMock);
   if (!bootstrap) app.useClient(sdkClient);
   const get = (selector) => document.querySelector(selector);
   get("#signin-email").value = session.user.email;

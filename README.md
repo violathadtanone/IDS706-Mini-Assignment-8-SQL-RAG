@@ -1,7 +1,7 @@
 [![Verify hosted database](https://github.com/violathadtanone/IDS706-Mini-Assignment-8-SQL-RAG/actions/workflows/test.yml/badge.svg)](https://github.com/violathadtanone/IDS706-Mini-Assignment-8-SQL-RAG/actions/workflows/test.yml)
 
 
-# IDS 706 Mini Major Assignment: Build a SQL Quiz with Supabase with RAG-Powered Text-to-SQL Application - 29 Oct 2026
+# IDS 706 Mini Major Assignment: Build a SQL Quiz with RAG-Powered Text-to-SQL Application - 29 Oct 2026
 
 ## Project Description
 This project consists of 2 phases
@@ -11,13 +11,16 @@ This project consists of 2 phases
 ## Project Structure
 
 ```text
-IDS706-Major-Assignment-2-SQLQuiz/
+IDS706-Mini-Assignment-8-SQL-RAG/
 ├── index.html                          # Quiz interface and sign-in dialog
 ├── style.css                           # Application styling and responsive layouts
-├── app.js                              # Authentication, quiz interactions, scoring, and API calls
+├── app.js                              # Authentication, quiz interactions, scoring, RAG assistant, and API calls
 ├── supabase-config.js                  # Browser-safe Supabase Project URL and publishable key
+├── rag-config.js                       # Browser-safe RAG Edge Function name
 ├── init.sql                            # Standalone database setup and seed script (contains resets)
 ├── query.py                            # Local Python database operations example
+├── sql_rag.py                          # Terminal RAG pipeline and local embedding cache
+├── rag_api.py                          # Python RAG backend reference implementation
 ├── requirements.txt                    # Python dependencies
 ├── README.md                           # Project overview, setup, and testing instructions
 ├── .gitignore                          # Excludes local credentials and generated files
@@ -27,10 +30,11 @@ IDS706-Major-Assignment-2-SQLQuiz/
 ├── supabase/
 │   ├── config.toml                     # Supabase project and Edge Function configuration
 │   ├── functions/
-│   │   └── quiz-api/                   # Authenticated quiz backend, SQL guard, and backend tests
+│   │   ├── quiz-api/                   # Existing authenticated quiz backend and SQL guard
+│   │   └── rag-api/                    # Authenticated RAG Edge Function and mocked tests
 │   └── migrations/                     # Dataset, restricted roles, saved answers, and audit/login tables
 ├── images/                             # Images used for supporting README.md explanation
-└── tests/                              # Frontend behavior and live database permission tests
+└── tests/                              # Frontend behavior, RAG checks, and live database permission tests
 ```
 <br><br>
 
@@ -40,6 +44,7 @@ IDS706-Major-Assignment-2-SQLQuiz/
 - Hints are available for guidance
 - Grading is based on the results returned by each query
 - Sign-in is required to begin the quiz.
+- SQL assistant converts natural-language questions into SQL queries with explanations, displays query results, and compares them with the expected answer when a quiz question is selected.
 - Link access to SQL Quiz: https://violathadtanone.github.io/IDS706-Mini-Assignment-8-SQL-RAG/#
 <br><br>
 
@@ -74,11 +79,14 @@ python -m pip install --upgrade pip
 - Follow https://nodejs.org/en/download to install Node.js
 <br><br>
 
-## Environment Setup Instructions - Create pre-requisite files
+## Create pre-requisite files
 
 ### 1. .env
 - This stores the PostgreSQL, Neo4j, and OpenAI connection settings and credentials used by the local Python scripts (query.py and sql_rag.py). The live quiz uses separate Supabase configuration and secrets.
-- After creating the Supabase database, open the Session Pooler connection details in Supabase and use those values to fill in the value based on the format below:
+- After creating the Supabase database, open the Session Pooler connection details in Supabase and use those values to fill up `.env` file.
+- Once Neo4j Aura instance is created, download and save its credentials file, which contains the connection URI, username, password, and database name to be included in `.env` file.
+- Create an OpenAI API key at https://platform.openai.com/home and use it to fill in OPENAI_API_KEY in `.env` file.
+- Format of `.env` file can be seen below:
 ```
 POSTGRES_DB=postgres
 POSTGRES_USER=postgres.<your-project-ref>
@@ -104,6 +112,11 @@ OPENAI_API_KEY=<your-openai-api-key>
 ```
 psycopg2-binary
 python-dotenv
+neo4j
+openai
+fastapi
+uvicorn
+httpx
 ```
 - Install the requirements in the virtual environment `(.venv) (base)` with the code below in Terminal:
 ```bash
@@ -124,7 +137,7 @@ python -m pip install -r requirements.txt
 
 ## Overall Project Architecture & Core Components
 
-![Diagram](images/project-architecture.svg)
+![Diagram](images/project-architecture.png)
 The project uses a simple three-part setup:
 - Local development: query.py connects to the hosted PostgreSQL database using credentials stored in .env. The connection uses the Supabase Session Pooler with sslmode=require.
 - Supabase: PostgreSQL stores the schools, students, and meals tables. Supabase also provides authentication and the backend used to run and save quiz queries.
