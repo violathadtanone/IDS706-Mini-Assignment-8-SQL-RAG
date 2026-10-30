@@ -138,10 +138,12 @@ python -m pip install -r requirements.txt
 ## Overall Project Architecture & Core Components
 
 ![Diagram](images/project-architecture.png)
-The project uses a simple three-part setup:
+The project uses the following setup:
 - Local development: query.py connects to the hosted PostgreSQL database using credentials stored in .env. The connection uses the Supabase Session Pooler with sslmode=require.
 - Supabase: PostgreSQL stores the schools, students, and meals tables. Supabase also provides authentication and the backend used to run and save quiz queries.
 - GitHub: GitHub Pages hosts the quiz website, while GitHub Actions verifies that the hosted database is reachable using a GitHub Secret.
+- Neo4j: Neo4j stores knowledge about the dataset and retrieves relevant context. 
+- OpenAI: OpenAI uses that context from Neo4j to generate SQL queries and explanations.
 
 
 ### 1. Authentication
@@ -154,10 +156,21 @@ The project uses a simple three-part setup:
 - Workflow uses the Supabase Session Pooler connection with SSL. Database passwords are not stored in the workflow file or committed to GitHub.
 - Workflow runs automatically on pushes to main and can also be started manually from the GitHub Actions tab.
 
-### 3. Additional features
+### 3. RAG Architecture
+- Neo4j stores the database schema, business rules, and example SQL queries.
+- For each user question, the application retrieves relevant knowledge from Neo4j and passes it to OpenAI to help generate SQL.
+- Workflow: User question → Vector retrieval → AI model → Generated SQL.
+
+### 4. AI API
+- OpenAI generates SQL queries and brief explanations using the user’s question and retrieved knowledge.
+- API key is stored securely in Supabase secrets for the deployed application and .env for local testing.
+- Generated SQL runs with read-only access, and results can be checked against the selected quiz’s expected answer.
+
+### 5. Additional features
 - Parameterized queries: Application-owned database operations use parameters rather than f-string or string-concatenated SQL, helping reduce SQL injection risk.  
 - Audit logging: Query runs and saved quiz answers are recorded in quiz_audit_log, including who performed the action, what was run or saved, and when it occurred.  
 - Audit-log integrity: The restricted quiz role cannot modify the audit history. Direct UPDATE, DELETE, and TRUNCATE attempts are blocked by PostgreSQL permissions.
+- Result validation: When a quiz question is selected under “Validate against,” generated results are compared with that question’s expected results. General questions display results without a correctness verdict.
 <br><br>
 
 ## SQL Quiz Instructions
@@ -170,6 +183,19 @@ The project uses a simple three-part setup:
 7. Use Check My SQL to check the returned result.
 8. Save quiz progress while signed in.
 
+## SQL Assistant Instructions
+1. Click "Ask SQL Assistant" to open the chat
+2. Enter your question, including the required columns, filters, sorting, and row limit.
+3. Click Generate SQL to receive SQL, an explanation, and automatically executed query results.
 
-project file
-leveraging previously connect databased hosted on Supabase
+<p align="center">
+  <img src="images/sqlquiz-1.png" width="45%">
+  <img src="images/sqlquiz-2.png" width="45%">
+</p>
+
+4. Under Validate against option can also be used by selecting a particular quiz question or General question.
+5. If a quiz question was selected, the agent will review whether the results match its expected answer.
+<p align="center">
+  <img src="images/sqlquiz-3.png" width="45%">
+  <img src="images/sqlquiz-4.png" width="45%">
+</p>
