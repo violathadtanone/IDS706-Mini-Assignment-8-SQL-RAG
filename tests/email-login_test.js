@@ -324,6 +324,107 @@ Deno.test("signed-in assistant sends the current session token to rag-api", asyn
   );
 });
 
+Deno.test("general assistant SQL executes without a correctness verdict", async () => {
+  const { app, get, requests, session } = setup();
+  await app.applySession(session);
+  get("#assistant-input").value = "Count the students.";
+  await app.generateAssistantSql(event);
+  const runRequests = requests.filter(([name]) => name === "run");
+  assert(runRequests.length === 1, "General SQL should execute once");
+  const assistantItem = get("#assistant-messages").children.find((child) =>
+    String(child.className).includes("assistant-message is-assistant")
+  );
+  const execution = assistantItem.children.find((child) => child.className === "assistant-execution");
+  assert(execution, "Generated results should be shown in the assistant");
+  assert(
+    execution.children.some((child) => child.className === "assistant-validation-status" && child.textContent === "No expected answer selected"),
+    "General SQL should not receive a correctness verdict",
+  );
+});
+
+Deno.test("quiz validation runs generated and expected SQL and reports a match", async () => {
+  const { app, get, requests, session } = setup();
+  await app.applySession(session);
+  get("#assistant-validation-target").value = "top-students";
+  get("#assistant-input").value = "Return the top students.";
+  await app.generateAssistantSql(event);
+  assert(requests.filter(([name]) => name === "run").length === 2, "Quiz validation should run both queries");
+  const assistantItem = get("#assistant-messages").children.find((child) =>
+    String(child.className).includes("assistant-message is-assistant")
+  );
+  const execution = assistantItem.children.find((child) => child.className === "assistant-execution");
+  assert(
+    execution.children.some((child) => child.textContent === "Matches expected results"),
+    "Matching quiz results should be reported",
+  );
+});
+
+Deno.test("validation target is captured before the request starts", async () => {
+  const response = deferred();
+  const { app, get, requests, session } = setup({ ragResponse: response.promise });
+  await app.applySession(session);
+  get("#assistant-validation-target").value = "average-gpa";
+  get("#assistant-input").value = "Group students by school.";
+  const pending = app.generateAssistantSql(event);
+  get("#assistant-validation-target").value = "school-cost";
+  response.resolve({
+    data: {
+      kind: "sql",
+      sql: "SELECT school_name FROM schools;",
+      explanation: "Lists schools.",
+      sources: [],
+    },
+    error: null,
+  });
+  await pending;
+  const runRequests = requests.filter(([name]) => name === "run");
+  assert(runRequests.length === 2, "Captured target should still run generated and expected SQL");
+  assert(runRequests[0][1].questionId === "average-gpa", "Generated SQL used the changed selector");
+  assert(runRequests[1][1].questionId === "average-gpa", "Expected SQL used the changed selector");
+});
+
+Deno.test("expected-answer execution failure preserves results and reports validation unavailable", async () => {
+  const { app, get, requests, session } = setup({
+    invokeHook(body) {
+      if (body.action === "run" && body.query === app.quizzes[body.questionId].solution) {
+        return { data: null, error: new Error("Expected query unavailable") };
+      }
+    },
+  });
+  await app.applySession(session);
+  get("#assistant-validation-target").value = "top-students";
+  get("#assistant-input").value = "Return the top students.";
+  await app.generateAssistantSql(event);
+  assert(requests.filter(([name]) => name === "run").length === 2, "Expected SQL should still be attempted");
+  const assistantItem = get("#assistant-messages").children.find((child) =>
+    String(child.className).includes("assistant-message is-assistant")
+  );
+  const execution = assistantItem.children.find((child) => child.className === "assistant-execution");
+  assert(execution.children.some((child) => child.className === "assistant-result-table"), "Generated results should remain visible");
+  assert(execution.children.some((child) => child.textContent === "Validation unavailable"), "Validation failure status is missing");
+  assert(!execution.children.some((child) => child.textContent === "Does not match expected results"), "Validation failure is not a mismatch");
+});
+
+Deno.test("mismatched quiz results do not report an execution error", async () => {
+  const { app, get, session } = setup({
+    invokeHook(body) {
+      if (body.action === "run" && body.query === app.quizzes[body.questionId].solution) {
+        return { data: { columns: app.quizzes[body.questionId].headers, rows: [], truncated: false }, error: null };
+      }
+    },
+  });
+  await app.applySession(session);
+  get("#assistant-validation-target").value = "top-students";
+  get("#assistant-input").value = "Return the top students.";
+  await app.generateAssistantSql(event);
+  const assistantItem = get("#assistant-messages").children.find((child) =>
+    String(child.className).includes("assistant-message is-assistant")
+  );
+  const execution = assistantItem.children.find((child) => child.className === "assistant-execution");
+  assert(execution.children.some((child) => child.textContent === "Does not match expected results"), "Mismatch status is missing");
+  assert(!execution.children.some((child) => String(child.textContent).startsWith("Execution error:")), "Mismatch should not be an execution error");
+});
+
 Deno.test("assistant does not include the removed quiz-question shortcut", () => {
   assert(!source.includes("assistant-use-question"), "Removed shortcut markup is still present");
   assert(!source.includes("assistantUseQuestion"), "Removed shortcut handler is still present");
@@ -399,7 +500,7 @@ Deno.test("clipboard failure shows a clear message", async () => {
 });
 
 Deno.test("unavailable dataset responses show only the Response layout", async () => {
-  const { app, get, session } = setup({
+  const { app, get, requests, session } = setup({
     ragPayload: {
       kind: "clarification",
       sql: "",
@@ -418,6 +519,24 @@ Deno.test("unavailable dataset responses show only the Response layout", async (
   assert(!assistantItem.children.some((child) => child.className === "assistant-sql-heading"), "Clarification must not show SQL heading");
   assert(!assistantItem.children.some((child) => child.className === "assistant-sql"), "Clarification must not show SQL");
   assert(!assistantItem.children.some((child) => child.className === "assistant-copy"), "Clarification must not show Copy SQL");
+  assert(!requests.some(([name]) => name === "run"), "Clarification must not execute SQL");
+});
+
+Deno.test("generated SQL execution errors are shown separately", async () => {
+  const { app, get, session } = setup({
+    invokeHook(body) {
+      if (body.action === "run") return { data: null, error: new Error("Read-only query rejected") };
+    },
+  });
+  await app.applySession(session);
+  get("#assistant-input").value = "Count students.";
+  await app.generateAssistantSql(event);
+  const assistantItem = get("#assistant-messages").children.find((child) =>
+    String(child.className).includes("assistant-message is-assistant")
+  );
+  const execution = assistantItem.children.find((child) => child.className === "assistant-execution");
+  assert(execution.children.some((child) => child.textContent === "Execution error: Read-only query rejected"), "Execution error is missing");
+  assert(!execution.children.some((child) => child.textContent === "Does not match expected results"), "Execution error must not be a mismatch");
 });
 
 Deno.test("assistant opens and X closes the entire panel", () => {

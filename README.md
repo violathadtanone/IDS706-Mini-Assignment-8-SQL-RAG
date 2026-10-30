@@ -1,9 +1,12 @@
-[![Verify hosted database](https://github.com/violathadtanone/IDS706-Major-Assignment-2-SQLQuiz/actions/workflows/test.yml/badge.svg)](https://github.com/violathadtanone/IDS706-Major-Assignment-2-SQLQuiz/actions/workflows/test.yml)
+[![Verify hosted database](https://github.com/violathadtanone/IDS706-Mini-Assignment-8-SQL-RAG/actions/workflows/test.yml/badge.svg)](https://github.com/violathadtanone/IDS706-Mini-Assignment-8-SQL-RAG/actions/workflows/test.yml)
 
-# IDS 706 2nd Major Assignment: Build a SQL Quiz with Supabase - 20 Oct 2026
+
+# IDS 706 Mini Major Assignment: Build a SQL Quiz with Supabase with RAG-Powered Text-to-SQL Application - 29 Oct 2026
 
 ## Project Description
-This is 2nd major assignment under IDS 706 with the purpose to build a small system: a hosted database, sign-in, automation, and a SQL quiz that runs against live data.
+This project consists of 2 phases
+- Phase 1 aims to build a small system: a hosted database, sign-in, automation, and a SQL quiz that runs against live data.
+- Phase 2 is an enhancement of SQL quiz with RAG-Powered Text-to-SQL agent. This supports in developing our understanding of how databases, vector databases, and AI models work together.
 
 ## Project Structure
 
@@ -71,7 +74,8 @@ python -m pip install --upgrade pip
 - Follow https://nodejs.org/en/download to install Node.js
 <br><br>
 
-## Supabase Setup Instructions - Create pre-requisite files
+## Environment Setup Instructions - Create pre-requisite files
+
 ### 1. .env
 - This stores the database connection settings used by the local Python script (query.py). The live quiz uses separate Supabase configuration and secrets.
 - After creating the Supabase database, open the Session Pooler connection details in Supabase and use those values to fill in the value based on the format below:
@@ -145,3 +149,7 @@ The project uses a simple three-part setup:
 6. Use the hint when needed to compare the expected SQL approach and expected result.
 7. Use Check My SQL to check the returned result.
 8. Save quiz progress while signed in.
+
+
+project file
+leveraging previously connect databased hosted on Supabase

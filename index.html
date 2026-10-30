@@ -348,6 +348,15 @@
         <label class="visually-hidden" for="assistant-input">Question for SQL assistant</label>
         <textarea id="assistant-input" rows="3" maxlength="2000" placeholder="How many students attend each school?" disabled></textarea>
         <p class="assistant-input-help">Include the columns, filters, sorting, and row limit you need. More detail helps the assistant match your requirements.</p>
+        <label class="assistant-validation-label" for="assistant-validation-target">Validate against</label>
+        <select id="assistant-validation-target" disabled>
+          <option value="general">General question</option>
+          <option value="top-students">Quiz 1 — Highest GPA</option>
+          <option value="average-gpa">Quiz 2 — GPA by school</option>
+          <option value="student-count">Quiz 3 — Free lunch reach</option>
+          <option value="city-cost">Quiz 4 — Lunch cost by city</option>
+          <option value="school-cost">Quiz 5 — Highest lunch budget</option>
+        </select>
         <div class="assistant-form-actions">
           <button class="button button-primary" id="assistant-generate" type="submit" disabled>Generate SQL</button>
         </div>

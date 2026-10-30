@@ -215,6 +215,7 @@ const assistantMessages = document.querySelector("#assistant-messages");
 const assistantForm = document.querySelector("#assistant-form");
 const assistantInput = document.querySelector("#assistant-input");
 const assistantGenerate = document.querySelector("#assistant-generate");
+const assistantValidationTarget = document.querySelector("#assistant-validation-target");
 const assistantState = {
   open: false,
   busy: false,
@@ -350,6 +351,34 @@ function renderAssistantMessages() {
       sqlShell.append(copyButton, copyStatus);
       item.append(sqlShell);
     }
+
+    if (message.result || message.executionError || message.validationStatus) {
+      const execution = document.createElement("div");
+      execution.className = "assistant-execution";
+      if (message.result) {
+        const resultHeading = document.createElement("strong");
+        resultHeading.className = "assistant-result-heading";
+        resultHeading.textContent = "Results";
+        execution.append(resultHeading);
+        const resultTable = document.createElement("div");
+        resultTable.className = "assistant-result-table";
+        renderTable(message.result.columns, message.result.rows, resultTable);
+        execution.append(resultTable);
+      }
+      if (message.executionError) {
+        const error = document.createElement("p");
+        error.className = "assistant-execution-error";
+        error.textContent = `Execution error: ${message.executionError}`;
+        execution.append(error);
+      }
+      if (message.validationStatus) {
+        const status = document.createElement("p");
+        status.className = `assistant-validation-status${message.validationStatus === "Does not match expected results" ? " is-error" : ""}`;
+        status.textContent = message.validationStatus;
+        execution.append(status);
+      }
+      item.append(execution);
+    }
     assistantMessages.append(item);
   }
 
@@ -365,8 +394,18 @@ function renderAssistantMessages() {
 function updateAssistantControls() {
   const enabled = signedIn && !assistantState.busy;
   assistantInput.disabled = !signedIn || assistantState.busy;
+  assistantValidationTarget.disabled = !enabled;
   assistantGenerate.disabled = !enabled;
   assistantGenerate.textContent = assistantState.busy ? "Generating…" : "Generate SQL";
+}
+
+async function invokeAssistantQuery(body, accessToken) {
+  const { data, error } = await client.functions.invoke("quiz-api", {
+    body,
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (error) throw new Error(error.message || "The quiz query could not be completed.");
+  return data;
 }
 
 function setAssistantOpen(open) {
@@ -421,6 +460,7 @@ async function generateAssistantSql(event) {
     });
     return;
   }
+  const validationTarget = assistantValidationTarget.value;
   const requestId = ++assistantState.requestId;
   assistantState.busy = true;
   addAssistantMessage({ role: "user", text: question });
@@ -443,12 +483,51 @@ async function generateAssistantSql(event) {
         typeof payload.sql !== "string" || typeof payload.explanation !== "string") {
       throw new Error("The SQL assistant returned an invalid response.");
     }
-    addAssistantMessage({
+    const assistantMessage = {
       role: "assistant",
       text: "",
       sql: payload.sql,
       explanation: payload.explanation,
-    });
+    };
+    addAssistantMessage(assistantMessage);
+    if (payload.kind !== "sql" || !payload.sql.trim()) return;
+
+    try {
+      const generatedResult = await invokeAssistantQuery({
+        action: "run",
+        questionId: validationTarget === "general" ? currentQuizId : validationTarget,
+        query: payload.sql,
+        parameters: [],
+      }, sessionData.session.access_token);
+      if (requestId !== assistantState.requestId) return;
+      assistantMessage.result = generatedResult;
+      if (validationTarget === "general") {
+        assistantMessage.validationStatus = "No expected answer selected";
+      } else {
+        try {
+          const expectedResult = await invokeAssistantQuery({
+            action: "run",
+            questionId: validationTarget,
+            query: quizzes[validationTarget].solution,
+            parameters: [],
+          }, sessionData.session.access_token);
+          if (requestId !== assistantState.requestId) return;
+          assistantMessage.validationStatus = answersMatch(generatedResult, expectedResult)
+            ? "Matches expected results"
+            : "Does not match expected results";
+        } catch (error) {
+          assistantMessage.validationStatus = "Validation unavailable";
+          assistantMessage.validationError = error instanceof Error
+            ? error.message
+            : "The expected answer could not be executed.";
+        }
+      }
+    } catch (error) {
+      assistantMessage.executionError = error instanceof Error
+        ? error.message
+        : "The generated SQL could not be executed.";
+    }
+    renderAssistantMessages();
   } catch (error) {
     if (requestId === assistantState.requestId) {
       addAssistantMessage({
