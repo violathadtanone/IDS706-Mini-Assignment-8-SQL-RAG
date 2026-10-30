@@ -45,7 +45,7 @@ IDS706-Mini-Assignment-8-SQL-RAG/
 - Grading is based on the results returned by each query
 - Sign-in is required to begin the quiz.
 - SQL assistant converts natural-language questions into SQL queries with explanations, displays query results, and compares them with the expected answer when a quiz question is selected.
-- Link access to SQL Quiz: https://violathadtanone.github.io/IDS706-Mini-Assignment-8-SQL-RAG/#
+- Link access to SQL Quiz: https://violathadtanone.github.io/IDS706-Mini-Assignment-8-SQL-RAG/
 <br><br>
 
 ## Overall Setup Instructions
@@ -174,7 +174,7 @@ The project uses the following setup:
 <br><br>
 
 ## SQL Quiz Instructions
-1. Open https://violathadtanone.github.io/IDS706-Major-Assignment-2-SQLQuiz/
+1. Open https://violathadtanone.github.io/IDS706-Mini-Assignment-8-SQL-RAG/
 2. Click sign in and open Magic Link sent to your email.
 3. Select one of the five SQL questions.
 4. Write a SQL query in the query editor.
@@ -186,7 +186,7 @@ The project uses the following setup:
 ## SQL Assistant Instructions
 1. Click "Ask SQL Assistant" to open the chat
 2. Enter your question, including the required columns, filters, sorting, and row limit.
-3. Click Generate SQL to receive SQL, an explanation, and automatically executed query results.
+3. Click "Generate SQL" to receive SQL, an explanation, and automatically executed query results.
 
 <p align="center">
   <img src="images/sqlquiz-1.png" width="45%">
@@ -194,7 +194,7 @@ The project uses the following setup:
 </p>
 
 4. Under Validate against option can also be used by selecting a particular quiz question or General question.
-5. If a quiz question was selected, the agent will review whether the results match its expected answer.
+5. If a quiz question was selected, the agent compares whether the results match its expected answer.
 <p align="center">
   <img src="images/sqlquiz-3.png" width="45%">
   <img src="images/sqlquiz-4.png" width="45%">
